@@ -393,6 +393,56 @@
   }
   .leader-score{font-variant-numeric:tabular-nums;color:var(--accent);}
 
+  /* ---------- torneo: elegir modo y compartir resultado ---------- */
+  .torneo-choice{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    width:100%;
+  }
+  .torneo-choice-btn{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    text-align:left;
+    background:var(--bg-sunken);
+    border:2px solid transparent;
+    border-radius:16px;
+    padding:14px 16px;
+    cursor:pointer;
+    color:var(--text);
+    width:100%;
+  }
+  .torneo-choice-btn:active{transform:scale(.98);}
+  .torneo-choice-btn .tc-icon{font-size:28px;flex:0 0 auto;line-height:1;}
+  .torneo-choice-btn .tc-text{display:flex;flex-direction:column;gap:2px;}
+  .torneo-choice-btn .tc-title{font-weight:800;font-size:15px;}
+  .torneo-choice-btn .tc-sub{font-weight:600;font-size:12px;color:var(--text-soft);}
+  .back-choice-btn{
+    font-size:12px;
+    padding:6px 14px;
+  }
+  .share-actions{
+    display:flex;
+    gap:8px;
+    justify-content:center;
+    flex-wrap:wrap;
+    margin-top:6px;
+  }
+  .share-preview{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    margin-top:6px;
+  }
+  .share-preview img{
+    width:100%;
+    max-width:220px;
+    border-radius:16px;
+    box-shadow:0 8px 24px -12px var(--shadow);
+  }
+
   /* ---------- mastery strip ---------- */
   .mastery{
     display:grid;
@@ -428,6 +478,8 @@
 </style>
 </head>
 <body>
+
+
 <div class="app">
   <header class="topbar">
     <div class="brand">
@@ -474,10 +526,11 @@
      Progreso persistente (localStorage). Si falla, seguimos
      igual, solo que sin memoria entre sesiones.
      ========================================================= */
-  var STORE_KEY  = "tablas-progreso-v1";
-  var FAILS_KEY  = "tablas-fallos-v1";
-  var BEST_KEY   = "tablas-mejor-contrarreloj-v1";
-  var TORNEO_KEY = "tablas-torneo-v1";
+  var STORE_KEY      = "tablas-progreso-v1";
+  var FAILS_KEY      = "tablas-fallos-v1";
+  var BEST_KEY       = "tablas-mejor-contrarreloj-v1";
+  var TORNEO_KEY     = "tablas-torneo-v1";
+  var SHARE_BEST_KEY = "tablas-torneo-compartir-mejor-v1";
 
   function loadJSON(key, fallback){
     try{
@@ -493,6 +546,7 @@
   var fallos   = loadJSON(FAILS_KEY, []); // [{a:3,b:7}, ...]
   var mejorContrarreloj = loadJSON(BEST_KEY, 0);
   var torneo = loadJSON(TORNEO_KEY, {}); // { "nombre en minúsculas": {name, best, games} } — clasificación local, se juega pasando el móvil
+  var mejorTorneoCompartir = loadJSON(SHARE_BEST_KEY, 0); // mejor marca de este móvil en el modo "cada una con el suyo"
 
   function regTable(t){
     if(!progreso[t]) progreso[t] = {correct:0, total:0};
@@ -517,7 +571,8 @@
     timerId: null,
     roundScore: 0,
     roundActive: false,
-    playerName: ""            // nombre de la jugadora actual en el modo Torneo
+    playerName: "",           // nombre de la jugadora actual en el modo Torneo
+    torneoSubmode: null       // null | "movil" | "compartir" — cómo se juega el Torneo
   };
 
   /* =========================================================
@@ -628,6 +683,7 @@
     if(mode === "contrarreloj"){
       renderContrarrelojIntro();
     }else if(mode === "torneo"){
+      state.torneoSubmode = null;
       renderTorneoIntro();
     }else{
       next();
@@ -638,7 +694,11 @@
   function updateHint(){
     if(state.mode === "practica") els.hint.textContent = "Escribe el resultado de memoria y pulsa ✓. Puedes elegir una sola tabla arriba.";
     else if(state.mode === "contrarreloj") els.hint.textContent = "60 segundos, las que aciertes suman. ¡A por tu récord: " + mejorContrarreloj + "!";
-    else if(state.mode === "torneo") els.hint.textContent = "Pasaos el móvil entre amigas: cada ronda son 45 segundos y suma para la clasificación.";
+    else if(state.mode === "torneo"){
+      if(state.torneoSubmode === "compartir") els.hint.textContent = "Juega tu ronda y comparte la imagen con el resultado por chat.";
+      else if(state.torneoSubmode === "movil") els.hint.textContent = "Pasaos el móvil entre amigas: cada ronda son 45 segundos y suma para la clasificación.";
+      else els.hint.textContent = "Elige cómo queréis jugar: pasando el móvil o cada una con el suyo.";
+    }
     else els.hint.textContent = "Aquí aparecen las multiplicaciones que fallaste, para repasarlas.";
   }
 
@@ -849,7 +909,8 @@
     stopTimer();
     state.roundActive = false;
     if(state.mode === "torneo"){
-      endTorneoRound();
+      if(state.torneoSubmode === "compartir") endTorneoShareRound();
+      else endTorneoRound();
     }else{
       endContrarrelojRound();
     }
@@ -870,7 +931,12 @@
     updateHint();
   }
 
-  /* ---------------- Torneo (varias jugadoras, mismo móvil) ---------------- */
+  /* ---------------- Torneo: dos formas de jugar ----------------
+     "movil": os pasáis el mismo móvil entre amigas y competís en
+              una clasificación local guardada en este dispositivo.
+     "compartir": cada una juega en su propio móvil y, al acabar,
+              genera una imagen con el resultado para compartirla
+              por WhatsApp, Just Talk Kids, etc. */
   function torneoRanking(){
     return Object.keys(torneo).map(function(k){ return torneo[k]; })
       .sort(function(x,y){ return y.best - x.best; });
@@ -897,8 +963,34 @@
     });
   }
   function renderTorneoIntro(){
+    if(state.torneoSubmode === "movil") renderTorneoMovilIntro();
+    else if(state.torneoSubmode === "compartir") renderTorneoCompartirIntro();
+    else renderTorneoModeChoice();
+  }
+  function renderTorneoModeChoice(){
     els.gameCard.innerHTML = '<div class="summary">'
       + '<span class="num">🏆</span>'
+      + '<p>¿Cómo vais a jugar el torneo?</p>'
+      + '<div class="torneo-choice">'
+      + '<button class="torneo-choice-btn" id="chooseMovil"><span class="tc-icon">📱</span><span class="tc-text"><span class="tc-title">Pasando el móvil</span><span class="tc-sub">Os turnáis con este móvil y competís en la clasificación</span></span></button>'
+      + '<button class="torneo-choice-btn" id="chooseCompartir"><span class="tc-icon">📤</span><span class="tc-text"><span class="tc-title">Cada una con el suyo</span><span class="tc-sub">Jugáis por separado y compartís el resultado por chat</span></span></button>'
+      + '</div>'
+      + '</div>';
+    document.getElementById("chooseMovil").addEventListener("click", function(){
+      state.torneoSubmode = "movil";
+      renderTorneoIntro();
+      updateHint();
+    });
+    document.getElementById("chooseCompartir").addEventListener("click", function(){
+      state.torneoSubmode = "compartir";
+      renderTorneoIntro();
+      updateHint();
+    });
+  }
+  function renderTorneoMovilIntro(){
+    els.gameCard.innerHTML = '<div class="summary">'
+      + '<button class="ghost-btn back-choice-btn" id="backChoiceMovil">‹ Cambiar modo</button>'
+      + '<span class="num">📱</span>'
       + '<p>Pasaos el móvil: cada una escribe su nombre y juega 45 segundos.</p>'
       + '<input class="name-input" id="playerName" type="text" maxlength="16" placeholder="Tu nombre" value="'+escapeHTML(state.playerName)+'">'
       + '<button class="primary-btn" id="startTorneoBtn">Jugar mi ronda</button>'
@@ -906,6 +998,11 @@
       + renderLeaderboardHTML()
       + (torneoRanking().length ? '<button class="ghost-btn" id="clearTorneoBtn" style="margin-top:8px">Borrar clasificación</button>' : '')
       + '</div>';
+    document.getElementById("backChoiceMovil").addEventListener("click", function(){
+      state.torneoSubmode = null;
+      renderTorneoIntro();
+      updateHint();
+    });
     var nameInput = document.getElementById("playerName");
     document.getElementById("startTorneoBtn").addEventListener("click", function(){
       var name = nameInput.value.trim();
@@ -930,9 +1027,37 @@
         }
         torneo = {};
         saveJSON(TORNEO_KEY, torneo);
-        renderTorneoIntro();
+        renderTorneoMovilIntro();
       });
     }
+  }
+  function renderTorneoCompartirIntro(){
+    els.gameCard.innerHTML = '<div class="summary">'
+      + '<button class="ghost-btn back-choice-btn" id="backChoiceCompartir">‹ Cambiar modo</button>'
+      + '<span class="num">📤</span>'
+      + '<p>Juega tu ronda de 45 segundos y comparte tu resultado con tus amigas.</p>'
+      + '<input class="name-input" id="playerNameShare" type="text" maxlength="16" placeholder="Tu nombre" value="'+escapeHTML(state.playerName)+'">'
+      + (mejorTorneoCompartir ? '<p class="hint" style="margin:0">Tu mejor marca: <b>'+mejorTorneoCompartir+'</b></p>' : '')
+      + '<button class="primary-btn" id="startTorneoShareBtn">Jugar mi ronda</button>'
+      + '<p class="feedback" id="torneoShareMsg"></p>'
+      + '</div>';
+    document.getElementById("backChoiceCompartir").addEventListener("click", function(){
+      state.torneoSubmode = null;
+      renderTorneoIntro();
+      updateHint();
+    });
+    var nameInput = document.getElementById("playerNameShare");
+    document.getElementById("startTorneoShareBtn").addEventListener("click", function(){
+      var name = nameInput.value.trim();
+      if(!name){
+        document.getElementById("torneoShareMsg").textContent = "Escribe tu nombre primero.";
+        document.getElementById("torneoShareMsg").className = "feedback bad";
+        nameInput.focus();
+        return;
+      }
+      state.playerName = name;
+      startRound(45);
+    });
   }
   function endTorneoRound(){
     var key = state.playerName.trim().toLowerCase();
@@ -962,6 +1087,194 @@
     document.getElementById("changePlayerBtn").addEventListener("click", function(){
       state.playerName = "";
       renderTorneoIntro();
+    });
+  }
+
+  /* ---------------- Torneo: modo "cada una con el suyo" ----------------
+     Al acabar la ronda se genera una imagen (canvas) con el resultado y
+     se ofrece compartirla con la Web Share API (WhatsApp, Just Talk Kids,
+     lo que sea que tengan instalado); si el móvil no lo soporta, se
+     enseña la imagen en pantalla para guardarla o compartirla a mano. */
+  function endTorneoShareRound(){
+    var name = state.playerName.trim() || "Jugadora";
+    var esRecordPersonal = state.roundScore > mejorTorneoCompartir;
+    if(esRecordPersonal){
+      mejorTorneoCompartir = state.roundScore;
+      saveJSON(SHARE_BEST_KEY, mejorTorneoCompartir);
+    }
+    els.gameCard.innerHTML = '<div class="summary">'
+      + '<span class="num">'+state.roundScore+'</span>'
+      + '<p>¡Bien jugado, '+escapeHTML(name)+'! '+(esRecordPersonal ? "Nueva mejor marca personal 🎉" : "Tu mejor marca sigue siendo "+mejorTorneoCompartir)+'</p>'
+      + '<div class="share-actions">'
+      + '<button class="primary-btn" id="shareResultBtn">📤 Compartir resultado</button>'
+      + '<button class="ghost-btn" id="retryShareBtn">Jugar otra ronda</button>'
+      + '</div>'
+      + '<p class="feedback" id="shareMsg"></p>'
+      + '<button class="ghost-btn back-choice-btn" id="backChoiceShare" style="margin-top:6px">‹ Cambiar modo</button>'
+      + '</div>';
+    document.getElementById("shareResultBtn").addEventListener("click", function(){
+      shareResultCard(name, state.roundScore, esRecordPersonal);
+    });
+    document.getElementById("retryShareBtn").addEventListener("click", function(){ startRound(45); });
+    document.getElementById("backChoiceShare").addEventListener("click", function(){
+      state.torneoSubmode = null;
+      renderTorneoIntro();
+      updateHint();
+    });
+  }
+
+  // Dibuja la misma mascota redonda de la cabecera, a escala, sobre un canvas.
+  function drawMascot(ctx, cx, cy, r){
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.fillStyle = "#FFE3DE";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r*0.77, 0, Math.PI*2);
+    ctx.fillStyle = "#FF5D5D";
+    ctx.fill();
+    var eyeOffsetX = r*0.31, eyeOffsetY = r*-0.12, eyeR = r*0.16;
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(cx-eyeOffsetX, cy+eyeOffsetY, eyeR, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx+eyeOffsetX, cy+eyeOffsetY, eyeR, 0, Math.PI*2); ctx.fill();
+    var pupilR = eyeR*0.5;
+    ctx.fillStyle = "#241E33";
+    ctx.beginPath(); ctx.arc(cx-eyeOffsetX, cy+eyeOffsetY+r*0.03, pupilR, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx+eyeOffsetX, cy+eyeOffsetY+r*0.03, pupilR, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath();
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = r*0.09;
+    ctx.lineCap = "round";
+    ctx.arc(cx, cy+r*0.18, r*0.36, 0.15*Math.PI, 0.85*Math.PI);
+    ctx.stroke();
+  }
+
+  // Tarjeta-imagen con el resultado, pensada para compartirse en un chat:
+  // colores fijos (no depende del tema claro/oscuro del móvil que la reciba).
+  function buildResultCardCanvas(name, score, esRecord){
+    var W = 900, H = 1200;
+    var canvas = document.createElement("canvas");
+    canvas.width = W; canvas.height = H;
+    var ctx = canvas.getContext("2d");
+
+    var grad = ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0, "#FFF7EC");
+    grad.addColorStop(1, "#FFE3DE");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,W,H);
+
+    ctx.fillStyle = "#FF5D5D";
+    ctx.fillRect(0,0,W,240);
+
+    drawMascot(ctx, W/2, 130, 90);
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#241E33";
+    ctx.font = "800 46px 'Baloo 2'";
+    ctx.fillText("Tablas de Multiplicar", W/2, 310);
+
+    ctx.font = "700 32px 'Nunito'";
+    ctx.fillStyle = "#7A7290";
+    ctx.fillText(name, W/2, 360);
+
+    ctx.font = "800 280px 'Baloo 2'";
+    ctx.fillStyle = "#FF5D5D";
+    ctx.fillText(String(score), W/2, 650);
+
+    ctx.font = "700 36px 'Nunito'";
+    ctx.fillStyle = "#241E33";
+    ctx.fillText("aciertos en 45 segundos", W/2, 710);
+
+    if(esRecord){
+      ctx.font = "800 38px 'Baloo 2'";
+      ctx.fillStyle = "#1FB6A4";
+      ctx.fillText("🏆 ¡Nuevo récord personal!", W/2, 780);
+    }
+
+    ctx.font = "700 28px 'Nunito'";
+    ctx.fillStyle = "#7A7290";
+    ctx.fillText("¿Te atreves a superarme?", W/2, H-140);
+    ctx.font = "700 24px 'Nunito'";
+    ctx.fillText("adsepal.github.io/tablas-multiplicar", W/2, H-95);
+
+    return canvas;
+  }
+
+  function ensureCardFonts(){
+    if(!(document.fonts && document.fonts.load)) return Promise.resolve();
+    return Promise.all([
+      document.fonts.load("800 40px 'Baloo 2'"),
+      document.fonts.load("700 30px 'Nunito'")
+    ]).catch(function(){ }).then(function(){
+      return document.fonts.ready;
+    });
+  }
+
+  function buildResultCardBlob(name, score, esRecord){
+    return ensureCardFonts().then(function(){
+      var canvas = buildResultCardCanvas(name, score, esRecord);
+      return new Promise(function(resolve, reject){
+        canvas.toBlob(function(blob){
+          if(blob) resolve(blob); else reject(new Error("toBlob failed"));
+        }, "image/png");
+      });
+    });
+  }
+
+  function offerImageFallback(blob, msgEl){
+    var url = URL.createObjectURL(blob);
+    var old = els.gameCard.querySelector(".share-preview");
+    if(old) old.remove();
+    var div = document.createElement("div");
+    div.className = "share-preview";
+    // Dentro de un Artifact de Claude el enlace de descarga normal no
+    // funciona (el visor no da permiso), así que ahí usamos su propia
+    // capacidad de descargas; fuera (la web publicada) usamos el enlace
+    // de toda la vida. En ambos casos se puede mantener pulsada la
+    // imagen para guardarla o compartirla a mano.
+    var inClaude = !!(window.claude && window.claude.use);
+    div.innerHTML = '<img src="'+url+'" alt="Resultado">'
+      + '<p class="hint">Mantén pulsada la imagen para guardarla o compartirla'
+      + (inClaude ? ', o <button class="ghost-btn" id="dlBtn" style="margin-top:6px">Guardar imagen</button>' : ', o <a href="'+url+'" download="tablas-resultado.png">descárgala aquí</a>')
+      + '.</p>';
+    els.gameCard.appendChild(div);
+    if(msgEl) msgEl.textContent = "";
+    if(inClaude){
+      var dlBtn = document.getElementById("dlBtn");
+      if(dlBtn){
+        dlBtn.addEventListener("click", function(){
+          window.claude.use("downloads").then(function(downloads){
+            if(!downloads) return;
+            return downloads.save({ filename: "tablas-resultado.png", data: blob });
+          }).catch(function(){ /* el visor no lo permite: queda la imagen para guardarla a mano */ });
+        });
+      }
+    }
+  }
+
+  function shareResultCard(name, score, esRecord){
+    var msgEl = document.getElementById("shareMsg");
+    if(msgEl){ msgEl.textContent = "Preparando imagen…"; msgEl.className = "feedback"; }
+    buildResultCardBlob(name, score, esRecord).then(function(blob){
+      var file = null;
+      try{ file = new File([blob], "tablas-"+score+".png", {type:"image/png"}); }catch(e){ file = null; }
+      var canShareFiles = !!(file && navigator.canShare && navigator.canShare({files:[file]}));
+      if(canShareFiles && navigator.share){
+        navigator.share({
+          files: [file],
+          title: "Tablas de Multiplicar",
+          text: "¡" + score + " aciertos en 45 segundos! ¿Te atreves a superarme?"
+        }).then(function(){
+          if(msgEl) msgEl.textContent = "";
+        }).catch(function(err){
+          if(err && err.name === "AbortError"){ if(msgEl) msgEl.textContent = ""; return; }
+          offerImageFallback(blob, msgEl);
+        });
+      }else{
+        offerImageFallback(blob, msgEl);
+      }
+    }).catch(function(){
+      if(msgEl){ msgEl.textContent = "No se pudo generar la imagen."; msgEl.className = "feedback bad"; }
     });
   }
 
@@ -1007,5 +1320,6 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
+
 </body>
 </html>
