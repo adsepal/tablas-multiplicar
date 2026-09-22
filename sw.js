@@ -1,7 +1,7 @@
 // Service worker de "Tablas de Multiplicar".
 // Guarda la app en caché para que funcione sin conexión tras la primera
 // visita, y se actualiza sola en segundo plano cuando hay red.
-var CACHE_NAME = "tablas-multiplicar-v2";
+var CACHE_NAME = "tablas-multiplicar-v3";
 var APP_SHELL = [
   "./",
   "./index.html",
