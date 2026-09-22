@@ -285,6 +285,30 @@
   .feedback.good{color:var(--success);}
   .feedback.bad{color:var(--wrong);}
 
+  .result-mark{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+    z-index:5;
+  }
+  .result-mark svg{
+    width:150px;
+    height:150px;
+    filter:drop-shadow(0 10px 22px var(--shadow));
+    animation:resultPop .38s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes resultPop{
+    0%{ transform:scale(.35); opacity:0; }
+    65%{ transform:scale(1.08); opacity:1; }
+    100%{ transform:scale(1); opacity:1; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .result-mark svg{ animation:none; }
+  }
+
   .empty-state{
     text-align:center;
     display:flex;
@@ -692,6 +716,25 @@
     else if(e.key === "Enter"){ handleKey("ok"); }
   });
 
+  // Marca grande de acierto/fallo: un badge en forma de ✓ o ✗ que aparece
+  // encima de la tarjeta al comprobar la respuesta (se borra solo con la
+  // siguiente pregunta, porque esa repinta toda la tarjeta).
+  function markSVG(ok){
+    var color = ok ? "var(--success)" : "var(--wrong)";
+    var path = ok
+      ? '<path d="M27 53 L43 69 L75 31" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none"/>'
+      : '<path d="M31 31 L69 69 M69 31 L31 69" stroke="#fff" stroke-width="10" stroke-linecap="round" fill="none"/>';
+    return '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="'+color+'"/>'+path+'</svg>';
+  }
+  function showResultMark(ok){
+    var old = els.gameCard.querySelector(".result-mark");
+    if(old) old.remove();
+    var mark = document.createElement("div");
+    mark.className = "result-mark";
+    mark.innerHTML = markSVG(ok);
+    els.gameCard.appendChild(mark);
+  }
+
   function checkAnswer(){
     if(state.answered || state.currentInput === "") return;
     state.answered = true;
@@ -702,6 +745,7 @@
     var displayEl = document.getElementById("answerDisplay");
     if(displayEl) displayEl.classList.add(ok ? "correct" : "wrong");
     Array.prototype.forEach.call(document.querySelectorAll(".keypad-btn"), function(b){ b.disabled = true; });
+    showResultMark(ok);
 
     var stats = regTable(q.a);
     stats.total++;
