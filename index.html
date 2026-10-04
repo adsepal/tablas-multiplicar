@@ -3,14 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Tablas de Multiplicar</title>
 <meta name="theme-color" content="#FF5D5D">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="description" content="Practica las tablas de multiplicar y el vocabulario de francés: aciertos de memoria, contrarreloj, fallos para repasar y torneo con amigas.">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Tablas ×">
+<meta name="apple-mobile-web-app-title" content="Tablas">
+<title>Tablas de Multiplicar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
@@ -98,6 +99,51 @@
     flex-direction:column;
     gap:14px;
   }
+  #subjectView{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    flex:1;
+    min-height:0;
+  }
+  #subjectView[hidden]{display:none;}
+
+  /* ---------- menú principal de asignaturas ---------- */
+  .subject-menu{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .subject-card{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    text-align:left;
+    background:var(--bg-card);
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:16px;
+    cursor:pointer;
+    box-shadow:0 8px 24px -16px var(--shadow);
+    color:var(--text);
+    width:100%;
+  }
+  .subject-card:active{transform:scale(.98);}
+  .subject-card .sc-icon{font-size:32px;flex:0 0 auto;line-height:1;}
+  .subject-card .sc-text{display:flex;flex-direction:column;gap:2px;}
+  .subject-card .sc-title{font-weight:800;font-size:16px;}
+  .subject-card .sc-sub{font-weight:600;font-size:12px;color:var(--text-soft);}
+
+  .subject-bar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .subject-bar-title{
+    font-weight:800;
+    font-size:14px;
+    color:var(--text-soft);
+  }
 
   /* ---------- header ---------- */
   .topbar{
@@ -154,6 +200,7 @@
     color:var(--accent-ink);
     border-color:transparent;
   }
+  .modes-3{grid-template-columns:repeat(3,1fr);}
 
   /* ---------- table chips ---------- */
   .tables-picker{
@@ -249,6 +296,84 @@
   @keyframes blink{ 50%{opacity:0;} }
   .answer-display.correct{background:var(--success-soft);border-color:var(--success);color:var(--success);}
   .answer-display.wrong{background:var(--wrong-soft);border-color:var(--wrong);color:var(--wrong);}
+
+  /* ---------- vocabulario de francés ---------- */
+  .fr-prompt{
+    font-family:'Baloo 2','Nunito',system-ui,sans-serif;
+    font-size:28px;
+    font-weight:800;
+    line-height:1.25;
+    padding:0 6px;
+  }
+  .frances-input{
+    display:block;
+    width:100%;
+    max-width:300px;
+    margin:0 auto;
+    text-align:center;
+    background:var(--bg-sunken);
+    border:2px solid transparent;
+    border-radius:16px;
+    padding:14px 16px;
+    font-family:inherit;
+    font-size:19px;
+    font-weight:800;
+    color:var(--text);
+  }
+  .frances-input:focus{border-color:var(--accent);outline:none;}
+  .frances-input.correct{background:var(--success-soft);border-color:var(--success);color:var(--success);}
+  .frances-input.wrong{background:var(--wrong-soft);border-color:var(--wrong);color:var(--wrong);}
+  .accent-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    justify-content:center;
+    max-width:300px;
+    margin:0 auto;
+  }
+  .accent-btn{
+    background:var(--bg-sunken);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:6px 11px;
+    font-size:16px;
+    font-weight:800;
+    color:var(--text);
+    cursor:pointer;
+  }
+  .accent-btn:active{transform:scale(.92);}
+  .accent-btn[disabled]{opacity:.5;cursor:default;transform:none;}
+
+  .gender-choice{
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    max-width:320px;
+    margin:0 auto;
+    width:100%;
+  }
+  .gender-btn{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    background:var(--bg-sunken);
+    border:2px solid transparent;
+    border-radius:16px;
+    padding:16px 8px;
+    font-weight:800;
+    font-size:15px;
+    color:var(--text);
+    cursor:pointer;
+  }
+  .gender-btn:active{transform:scale(.96);}
+  .gender-btn .gender-sub{font-weight:700;font-size:12px;color:var(--text-soft);}
+  .gender-btn[disabled]{opacity:.65;cursor:default;transform:none;}
+  .gender-btn.correct{background:var(--success-soft);border-color:var(--success);color:var(--success);}
+  .gender-btn.correct .gender-sub{color:var(--success);}
+  .gender-btn.wrong{background:var(--wrong-soft);border-color:var(--wrong);color:var(--wrong);}
+  .gender-btn.wrong .gender-sub{color:var(--wrong);}
 
   .keypad{
     display:grid;
@@ -501,21 +626,31 @@
     </div>
   </header>
 
-  <nav class="modes" role="tablist" id="modes">
-    <button class="mode-btn active" data-mode="practica" role="tab" aria-selected="true">Práctica</button>
-    <button class="mode-btn" data-mode="contrarreloj" role="tab" aria-selected="false">Contrarreloj</button>
-    <button class="mode-btn" data-mode="repaso" role="tab" aria-selected="false">Fallos</button>
-    <button class="mode-btn" data-mode="torneo" role="tab" aria-selected="false">Torneo</button>
-  </nav>
+  <section class="subject-menu" id="subjectMenu" aria-label="Elegir asignatura"></section>
 
-  <section class="tables-picker" id="tablesPicker" aria-label="Elegir tablas"></section>
+  <div id="subjectView" hidden>
+    <div class="subject-bar">
+      <button class="ghost-btn back-choice-btn" id="backToMenuBtn">‹ Menú</button>
+      <span class="subject-bar-title" id="subjectBarTitle"></span>
+    </div>
 
-  <main class="game-card" id="gameCard">
-    <div class="timerbar" id="timerBar" hidden><i id="timerFill"></i></div>
-  </main>
+    <nav class="modes" role="tablist" id="modes">
+      <button class="mode-btn active" data-mode="practica" role="tab" aria-selected="true">Práctica</button>
+      <button class="mode-btn" data-mode="contrarreloj" role="tab" aria-selected="false">Contrarreloj</button>
+      <button class="mode-btn" data-mode="repaso" role="tab" aria-selected="false">Fallos</button>
+      <button class="mode-btn" data-mode="torneo" role="tab" aria-selected="false">Torneo</button>
+    </nav>
 
-  <footer class="mastery" id="masteryStrip" aria-label="Progreso por tabla"></footer>
-  <p class="hint" id="hintText"></p>
+    <section class="tables-picker" id="tablesPicker" aria-label="Elegir tablas"></section>
+    <section class="tables-picker" id="categoryPicker" aria-label="Elegir categoría" hidden></section>
+
+    <main class="game-card" id="gameCard">
+      <div class="timerbar" id="timerBar" hidden><i id="timerFill"></i></div>
+    </main>
+
+    <footer class="mastery" id="masteryStrip" aria-label="Progreso por tabla"></footer>
+    <p class="hint" id="hintText"></p>
+  </div>
 </div>
 
 <script>
@@ -531,6 +666,8 @@
   var BEST_KEY       = "tablas-mejor-contrarreloj-v1";
   var TORNEO_KEY     = "tablas-torneo-v1";
   var SHARE_BEST_KEY = "tablas-torneo-compartir-mejor-v1";
+  var FALLOS_FR_KEY  = "tablas-fallos-frances-v1";
+  var BEST_FR_KEY    = "tablas-mejor-contrarreloj-frances-v1";
 
   function loadJSON(key, fallback){
     try{
@@ -547,6 +684,8 @@
   var mejorContrarreloj = loadJSON(BEST_KEY, 0);
   var torneo = loadJSON(TORNEO_KEY, {}); // { "nombre en minúsculas": {name, best, games} } — clasificación local, se juega pasando el móvil
   var mejorTorneoCompartir = loadJSON(SHARE_BEST_KEY, 0); // mejor marca de este móvil en el modo "cada una con el suyo"
+  var fallosFrances = loadJSON(FALLOS_FR_KEY, []); // [ "le poisson", ... ] — palabras francesas falladas
+  var mejorContrarrelojFrances = loadJSON(BEST_FR_KEY, 0);
 
   function regTable(t){
     if(!progreso[t]) progreso[t] = {correct:0, total:0};
@@ -554,11 +693,85 @@
   }
 
   /* =========================================================
+     Vocabulario de francés (examen de "la comida"). Cada palabra
+     lleva su artículo tal cual aparece en el libro de texto, porque
+     eso es justo lo que le van a pedir que escriba de memoria.
+     "es" es un array por si hay más de una traducción válida.
+     ========================================================= */
+  var FRANCES_DATA = [
+    {fr:"le poisson", es:["el pescado"], cat:"comida", g:"m"},
+    {fr:"une pomme", es:["la manzana"], cat:"comida", g:"f"},
+    {fr:"une pomme de terre", es:["la patata"], cat:"comida", g:"f"},
+    {fr:"le poulet", es:["el pollo"], cat:"comida", g:"m"},
+    {fr:"le riz", es:["el arroz"], cat:"comida", g:"m"},
+    {fr:"une salade", es:["la ensalada"], cat:"comida", g:"f"},
+    {fr:"une saucisse", es:["la salchicha"], cat:"comida", g:"f"},
+    {fr:"les spaghettis", es:["los espaguetis"], cat:"comida", g:"m"},
+    {fr:"le sucre", es:["el azúcar"], cat:"comida", g:"m"},
+    {fr:"une tarte aux pommes", es:["la tarta de manzana"], cat:"comida", g:"f"},
+    {fr:"une tomate", es:["el tomate"], cat:"comida", g:"f"},
+    {fr:"un yaourt", es:["el yogur"], cat:"comida", g:"m"},
+    {fr:"une banane", es:["el plátano"], cat:"comida", g:"f"},
+    {fr:"le beurre", es:["la mantequilla"], cat:"comida", g:"m"},
+    {fr:"une carotte", es:["la zanahoria"], cat:"comida", g:"f"},
+    {fr:"le chocolat", es:["el chocolate"], cat:"comida", g:"m"},
+    {fr:"la confiture", es:["la mermelada"], cat:"comida", g:"f"},
+    {fr:"le couscous", es:["el cuscús"], cat:"comida", g:"m"},
+    {fr:"une crêpe", es:["el crep","la crepe"], cat:"comida", g:"f"},
+    {fr:"un croissant", es:["el cruasán"], cat:"comida", g:"m"},
+    {fr:"la farine", es:["la harina"], cat:"comida", g:"f"},
+    {fr:"les fraises", es:["las fresas"], cat:"comida", g:"f"},
+    {fr:"les frites", es:["las patatas fritas"], cat:"comida", g:"f"},
+    {fr:"le fromage", es:["el queso"], cat:"comida", g:"m"},
+    {fr:"les haricots verts", es:["las judías verdes"], cat:"comida", g:"m"},
+    {fr:"le lait", es:["la leche"], cat:"comida", g:"m"},
+    {fr:"la levure", es:["la levadura"], cat:"comida", g:"f"},
+    {fr:"la moutarde", es:["la mostaza"], cat:"comida", g:"f"},
+    {fr:"un œuf", es:["el huevo"], cat:"comida", g:"m"},
+    {fr:"une orange", es:["la naranja"], cat:"comida", g:"f"},
+    {fr:"le pain", es:["el pan"], cat:"comida", g:"m"},
+    {fr:"une pêche", es:["el melocotón"], cat:"comida", g:"f"},
+    {fr:"une pizza", es:["la pizza"], cat:"comida", g:"f"},
+    {fr:"une assiette", es:["el plato"], cat:"mesa", g:"f"},
+    {fr:"un couteau", es:["el cuchillo"], cat:"mesa", g:"m"},
+    {fr:"une cuillère", es:["la cuchara"], cat:"mesa", g:"f"},
+    {fr:"une fourchette", es:["el tenedor"], cat:"mesa", g:"f"},
+    {fr:"une nappe", es:["el mantel"], cat:"mesa", g:"f"},
+    {fr:"une serviette", es:["la servilleta"], cat:"mesa", g:"f"},
+    {fr:"un verre", es:["el vaso"], cat:"mesa", g:"m"},
+    {fr:"un four", es:["el horno"], cat:"mesa", g:"m"},
+    {fr:"le petit-déjeuner", es:["el desayuno"], cat:"dia", g:"m"},
+    {fr:"le déjeuner", es:["el almuerzo","la comida"], cat:"dia", g:"m"},
+    {fr:"le goûter", es:["la merienda"], cat:"dia", g:"m"},
+    {fr:"le dîner", es:["la cena"], cat:"dia", g:"m"}
+  ];
+  var FR_CATS = [
+    {id:"todas", label:"Todas"},
+    {id:"comida", label:"Comida"},
+    {id:"mesa", label:"Mesa y cocina"},
+    {id:"dia", label:"Comidas del día"}
+  ];
+  var ACCENT_CHARS = ["é","è","ê","ë","î","ï","ô","û","ù","ç","œ"];
+
+  /* =========================================================
+     Asignaturas disponibles desde el menú principal. Para añadir
+     una nueva (restas, fracciones, lo que toque en el cole) basta
+     con añadir una entrada aquí y registrar sus funciones en
+     setMode()/next()/updateHint()/endRound(), igual que "frances".
+     ========================================================= */
+  var SUBJECTS = [
+    {id:"tablas", icon:"🔢", title:"Tablas de multiplicar", sub:"Practica las multiplicaciones de memoria"},
+    {id:"frances", icon:"🇫🇷", title:"Francés — Vocabulario", sub:"Significado, escritura y género de las palabras"}
+  ];
+
+  /* =========================================================
      Estado de la partida en curso. Esto SÍ se puede recuperar
      si la página se vuelve a publicar mientras Venus está
      jugando (ver window.claude.hot al final del archivo).
      ========================================================= */
   var state = {
+    subject: null,             // tablas | frances | null (en el menú)
+    francesCategory: "todas", // todas | comida | mesa | dia
     mode: "practica",         // practica | contrarreloj | repaso | torneo
     selectedTables: [1,2,3,4,5,6,7,8,9,10],
     streak: 0,
@@ -590,8 +803,13 @@
      ========================================================= */
 
   var els = {
+    subjectMenu: document.getElementById("subjectMenu"),
+    subjectView: document.getElementById("subjectView"),
+    backToMenuBtn: document.getElementById("backToMenuBtn"),
+    subjectBarTitle: document.getElementById("subjectBarTitle"),
     modes: document.getElementById("modes"),
     tablesPicker: document.getElementById("tablesPicker"),
+    categoryPicker: document.getElementById("categoryPicker"),
     gameCard: document.getElementById("gameCard"),
     masteryStrip: document.getElementById("masteryStrip"),
     streakVal: document.getElementById("streakVal"),
@@ -664,6 +882,85 @@
     if(state.mode === "practica") next();
   });
 
+  /* ---------------- Categorías de vocabulario (francés) ---------------- */
+  function renderCategoryPicker(){
+    var html = FR_CATS.map(function(c){
+      return '<button class="chip" data-cat="'+c.id+'">'+c.label+'</button>';
+    }).join('');
+    els.categoryPicker.innerHTML = html;
+    syncCategoryPickerUI();
+  }
+  function syncCategoryPickerUI(){
+    Array.prototype.forEach.call(els.categoryPicker.querySelectorAll(".chip"), function(chip){
+      chip.classList.toggle("active", chip.getAttribute("data-cat") === state.francesCategory);
+    });
+  }
+  els.categoryPicker.addEventListener("click", function(e){
+    var btn = e.target.closest(".chip");
+    if(!btn) return;
+    state.francesCategory = btn.getAttribute("data-cat");
+    syncCategoryPickerUI();
+    if(!state.roundActive && state.mode === "practica"){
+      next();
+    }
+  });
+
+  /* ---------------- Materia: Tablas / Francés ---------------- */
+  function renderSubjectMenu(){
+    els.subjectMenu.innerHTML = SUBJECTS.map(function(s){
+      return '<button type="button" class="subject-card" data-subject="'+s.id+'">'
+        + '<span class="sc-icon">'+s.icon+'</span>'
+        + '<span class="sc-text"><span class="sc-title">'+escapeHTML(s.title)+'</span><span class="sc-sub">'+escapeHTML(s.sub)+'</span></span>'
+        + '</button>';
+    }).join('');
+  }
+  els.subjectMenu.addEventListener("click", function(e){
+    var btn = e.target.closest(".subject-card");
+    if(!btn) return;
+    enterSubject(btn.getAttribute("data-subject"));
+  });
+  els.backToMenuBtn.addEventListener("click", function(){ showMenu(); });
+
+  function showMenu(){
+    stopTimer();
+    els.subjectMenu.hidden = false;
+    els.subjectView.hidden = true;
+  }
+  function enterSubject(id){
+    state.subject = id;
+    var def = SUBJECTS.filter(function(s){ return s.id === id; })[0];
+    els.subjectBarTitle.textContent = def ? def.title : "";
+    els.subjectMenu.hidden = true;
+    els.subjectView.hidden = false;
+    renderSubjectUI();
+    setMode("practica");
+  }
+  function renderSubjectUI(){
+    var isFrances = state.subject === "frances";
+    els.tablesPicker.hidden = isFrances;
+    els.masteryStrip.hidden = isFrances;
+    els.categoryPicker.hidden = !isFrances;
+    if(isFrances) renderCategoryPicker();
+    renderModesNav();
+  }
+  function renderModesNav(){
+    var isFrances = state.subject === "frances";
+    var html = '<button class="mode-btn" data-mode="practica" role="tab">Práctica</button>'
+      + '<button class="mode-btn" data-mode="contrarreloj" role="tab">Contrarreloj</button>'
+      + '<button class="mode-btn" data-mode="repaso" role="tab">Fallos</button>'
+      + (isFrances ? '' : '<button class="mode-btn" data-mode="torneo" role="tab">Torneo</button>');
+    els.modes.innerHTML = html;
+    els.modes.classList.toggle("modes-3", isFrances);
+    syncModeButtonsUI();
+  }
+  function syncModeButtonsUI(){
+    Array.prototype.forEach.call(els.modes.querySelectorAll(".mode-btn"), function(b){
+      var active = b.getAttribute("data-mode") === state.mode;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-selected", active ? "true" : "false");
+    });
+  }
+
   /* ---------------- Modos ---------------- */
   els.modes.addEventListener("click", function(e){
     var btn = e.target.closest(".mode-btn");
@@ -675,13 +972,10 @@
     stopTimer();
     state.mode = mode;
     state.roundActive = false;
-    Array.prototype.forEach.call(els.modes.querySelectorAll(".mode-btn"), function(b){
-      var active = b.getAttribute("data-mode") === mode;
-      b.classList.toggle("active", active);
-      b.setAttribute("aria-selected", active ? "true" : "false");
-    });
+    syncModeButtonsUI();
     if(mode === "contrarreloj"){
-      renderContrarrelojIntro();
+      if(state.subject === "frances") renderFrancesContrarrelojIntro();
+      else renderContrarrelojIntro();
     }else if(mode === "torneo"){
       state.torneoSubmode = null;
       renderTorneoIntro();
@@ -692,6 +986,12 @@
   }
 
   function updateHint(){
+    if(state.subject === "frances"){
+      if(state.mode === "practica") els.hint.textContent = "A veces te pide el significado, a veces escribirla en francés y a veces si es masculino o femenino. Todo de memoria.";
+      else if(state.mode === "contrarreloj") els.hint.textContent = "60 segundos de vocabulario. ¡A por tu récord: " + mejorContrarrelojFrances + "!";
+      else els.hint.textContent = "Aquí aparecen las palabras de francés que fallaste, para repasarlas.";
+      return;
+    }
     if(state.mode === "practica") els.hint.textContent = "Escribe el resultado de memoria y pulsa ✓. Puedes elegir una sola tabla arriba.";
     else if(state.mode === "contrarreloj") els.hint.textContent = "60 segundos, las que aciertes suman. ¡A por tu récord: " + mejorContrarreloj + "!";
     else if(state.mode === "torneo"){
@@ -704,6 +1004,15 @@
 
   /* ---------------- Práctica ---------------- */
   function next(){
+    if(state.subject === "frances"){
+      if(state.mode === "repaso"){
+        nextFrancesRepaso();
+        return;
+      }
+      state.current = generateFrancesPregunta(state.francesCategory);
+      renderFrancesQuestion();
+      return;
+    }
     if(state.mode === "repaso"){
       nextRepaso();
       return;
@@ -770,6 +1079,7 @@
   }
 
   document.addEventListener("keydown", function(e){
+    if(state.subject === "frances") return; // el modo francés tiene su propio input de texto
     if(!state.current || state.answered) return;
     if(e.key >= "0" && e.key <= "9"){ handleKey(e.key); }
     else if(e.key === "Backspace"){ handleKey("del"); }
@@ -908,6 +1218,10 @@
   function endRound(){
     stopTimer();
     state.roundActive = false;
+    if(state.subject === "frances"){
+      endFrancesContrarrelojRound();
+      return;
+    }
     if(state.mode === "torneo"){
       if(state.torneoSubmode === "compartir") endTorneoShareRound();
       else endTorneoRound();
@@ -1278,25 +1592,289 @@
     });
   }
 
+  /* ---------------- Vocabulario de francés ---------------- */
+  function stripAccents(s){
+    return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "");
+  }
+  function normalizeEs(s){
+    var t = stripAccents(String(s).toLowerCase()).trim();
+    t = t.replace(/[.,!?¡¿]/g, "");
+    t = t.replace(/\s+/g, " ");
+    t = t.replace(/^(el|la|los|las|un|una|unos|unas)\s+/, "");
+    return t;
+  }
+  function normalizeFr(s){
+    var t = String(s).toLowerCase().trim();
+    t = t.replace(/[.,!?]/g, "");
+    t = t.replace(/-/g, " ");
+    t = t.replace(/\s+/g, " ");
+    return t;
+  }
+
+  // El artículo (le/la/un/une/les) va pegado a la palabra en FRANCES_DATA
+  // porque eso es lo que tiene que escribir de memoria. "les" (plural) no
+  // revela género, así que esas palabras no entran en la pregunta de género.
+  function articleOf(fr){
+    var m = fr.match(/^(le|la|un|une|les)\s/);
+    return m ? m[1] : null;
+  }
+  function buildFrancesQuestion(item){
+    var art = articleOf(item.fr);
+    var dirs = ["fr2es", "es2fr"];
+    if(art && art !== "les") dirs.push("genero");
+    var dir = pick(dirs);
+    if(dir === "genero"){
+      return { dir: "genero", item: item, prompt: item.fr.replace(/^(le|la|un|une)\s+/, "") };
+    }
+    return { dir: dir, item: item, prompt: dir === "fr2es" ? item.fr : item.es[0] };
+  }
+  function generateFrancesPregunta(cat){
+    var pool = (cat === "todas") ? FRANCES_DATA : FRANCES_DATA.filter(function(w){ return w.cat === cat; });
+    if(!pool.length) pool = FRANCES_DATA;
+    return buildFrancesQuestion(pick(pool));
+  }
+
+  function insertAtCursor(input, text){
+    var start = input.selectionStart, end = input.selectionEnd;
+    if(start == null || end == null){ input.value += text; return; }
+    var val = input.value;
+    input.value = val.slice(0, start) + text + val.slice(end);
+    var pos = start + text.length;
+    input.setSelectionRange(pos, pos);
+    input.focus();
+  }
+
+  function renderFrancesQuestion(){
+    var q = state.current;
+    state.answered = false;
+    var timed = (state.mode === "contrarreloj");
+    var html = '';
+    if(timed) html += '<div class="timerbar" id="timerBar"><i id="timerFill"></i></div>';
+
+    if(q.dir === "genero"){
+      html += '<div class="question-wrap">'
+        + '<p class="question-sub">'+ (state.mode==="repaso" ? "Repasando un fallo" : "¿Es masculino o femenino?") +'</p>'
+        + '<div class="fr-prompt">'+escapeHTML(q.prompt)+'</div>'
+        + '</div>'
+        + '<div class="gender-choice">'
+        + '<button type="button" class="gender-btn" data-g="m">Masculino<span class="gender-sub">le / un</span></button>'
+        + '<button type="button" class="gender-btn" data-g="f">Femenino<span class="gender-sub">la / une</span></button>'
+        + '</div>'
+        + '<p class="feedback" id="feedback"></p>';
+      els.gameCard.innerHTML = html;
+      if(timed){
+        els.timerBar = document.getElementById("timerBar");
+        els.timerFill = document.getElementById("timerFill");
+      }
+      document.querySelector(".gender-choice").addEventListener("click", function(e){
+        var btn = e.target.closest(".gender-btn");
+        if(!btn || state.answered) return;
+        checkFrancesGenderAnswer(btn.getAttribute("data-g"));
+      });
+      return;
+    }
+
+    html += '<div class="question-wrap">'
+      + '<p class="question-sub">'+ (state.mode==="repaso" ? "Repasando un fallo" : (q.dir==="fr2es" ? "¿Qué significa?" : "Escribe en francés")) +'</p>'
+      + '<div class="fr-prompt">'+escapeHTML(q.prompt)+'</div>'
+      + '</div>'
+      + '<input class="frances-input" id="fracesInput" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="'+(q.dir==="fr2es" ? "Escribe el significado" : "Escribe la palabra en francés")+'">'
+      + (q.dir === "es2fr" ? '<div class="accent-row" id="accentRow">' + ACCENT_CHARS.map(function(c){ return '<button type="button" class="accent-btn" data-ch="'+c+'">'+c+'</button>'; }).join('') + '</div>' : '')
+      + '<button class="primary-btn" id="checkFrancesBtn">Comprobar ✓</button>'
+      + '<p class="feedback" id="feedback"></p>';
+    els.gameCard.innerHTML = html;
+    if(timed){
+      els.timerBar = document.getElementById("timerBar");
+      els.timerFill = document.getElementById("timerFill");
+    }
+    var input = document.getElementById("fracesInput");
+    input.focus();
+    input.addEventListener("keydown", function(e){
+      if(e.key === "Enter"){ e.preventDefault(); checkFrancesAnswer(); }
+    });
+    document.getElementById("checkFrancesBtn").addEventListener("click", checkFrancesAnswer);
+    var accentRow = document.getElementById("accentRow");
+    if(accentRow){
+      accentRow.addEventListener("click", function(e){
+        var btn = e.target.closest(".accent-btn");
+        if(!btn) return;
+        insertAtCursor(input, btn.getAttribute("data-ch"));
+      });
+    }
+  }
+
+  function checkFrancesGenderAnswer(ans){
+    if(state.answered) return;
+    state.answered = true;
+    var q = state.current;
+    var ok = ans === q.item.g;
+    Array.prototype.forEach.call(document.querySelectorAll(".gender-btn"), function(b){
+      b.disabled = true;
+      if(b.getAttribute("data-g") === q.item.g) b.classList.add("correct");
+      else if(b.getAttribute("data-g") === ans) b.classList.add("wrong");
+    });
+    showResultMark(ok);
+
+    var fb = document.getElementById("feedback");
+    if(ok){
+      state.streak++;
+      if(state.streak > 0 && state.streak % 5 === 0) state.stars++;
+      if(state.roundActive) state.roundScore++;
+      fb.textContent = pick(["¡Genial!","¡Eso es!","¡Muy bien!","¡Perfecto!","¡Sigue así!"]);
+      fb.className = "feedback good";
+      removeFromFallosFrances(q.item.fr);
+    }else{
+      state.streak = 0;
+      fb.textContent = "Era " + (q.item.g === "m" ? "masculino (le / un)" : "femenino (la / une)") + ": " + q.item.fr + ". ¡A por la siguiente!";
+      fb.className = "feedback bad";
+      addToFallosFrances(q.item.fr);
+    }
+    els.streakVal.textContent = state.streak;
+    els.starsVal.textContent = state.stars;
+
+    var delay = ok ? 900 : 2400;
+    setTimeout(function(){
+      if(state.roundActive || state.mode !== "contrarreloj"){
+        next();
+      }
+    }, delay);
+  }
+
+  function checkFrancesAnswer(){
+    if(state.answered) return;
+    var input = document.getElementById("fracesInput");
+    if(!input) return;
+    var raw = input.value;
+    if(raw.trim() === "") { input.focus(); return; }
+    state.answered = true;
+    var q = state.current;
+    var ok = (q.dir === "fr2es")
+      ? q.item.es.some(function(acc){ return normalizeEs(raw) === normalizeEs(acc); })
+      : normalizeFr(raw) === normalizeFr(q.item.fr);
+
+    input.disabled = true;
+    input.classList.add(ok ? "correct" : "wrong");
+    document.getElementById("checkFrancesBtn").disabled = true;
+    Array.prototype.forEach.call(document.querySelectorAll(".accent-btn"), function(b){ b.disabled = true; });
+    showResultMark(ok);
+
+    var fb = document.getElementById("feedback");
+    if(ok){
+      state.streak++;
+      if(state.streak > 0 && state.streak % 5 === 0) state.stars++;
+      if(state.roundActive) state.roundScore++;
+      fb.textContent = pick(["¡Genial!","¡Eso es!","¡Muy bien!","¡Perfecto!","¡Sigue así!"]);
+      fb.className = "feedback good";
+      removeFromFallosFrances(q.item.fr);
+    }else{
+      state.streak = 0;
+      var correcta = (q.dir === "fr2es") ? q.item.es[0] : q.item.fr;
+      fb.textContent = "Era: " + correcta + ". ¡A por la siguiente!";
+      fb.className = "feedback bad";
+      addToFallosFrances(q.item.fr);
+    }
+    els.streakVal.textContent = state.streak;
+    els.starsVal.textContent = state.stars;
+
+    var delay = ok ? 900 : 2400; // un poco más de tiempo para leer bien la palabra escrita
+    setTimeout(function(){
+      if(state.roundActive || state.mode !== "contrarreloj"){
+        next();
+      }
+    }, delay);
+  }
+
+  function addToFallosFrances(frWord){
+    if(fallosFrances.indexOf(frWord) === -1){
+      fallosFrances.push(frWord);
+      saveJSON(FALLOS_FR_KEY, fallosFrances);
+    }
+  }
+  function removeFromFallosFrances(frWord){
+    var next = fallosFrances.filter(function(w){ return w !== frWord; });
+    if(next.length !== fallosFrances.length){
+      fallosFrances = next;
+      saveJSON(FALLOS_FR_KEY, fallosFrances);
+    }
+  }
+  function nextFrancesRepaso(){
+    if(fallosFrances.length === 0){
+      els.gameCard.innerHTML = '<div class="empty-state">'
+        + '<span class="num">🎉</span>'
+        + '<p>¡No hay fallos pendientes! Sigue practicando el vocabulario y lo que falles aparecerá aquí para repasarlo.</p>'
+        + '<button class="primary-btn" id="goPracticaFr">Ir a práctica</button>'
+        + '</div>';
+      document.getElementById("goPracticaFr").addEventListener("click", function(){ setMode("practica"); });
+      return;
+    }
+    var frWord = pick(fallosFrances);
+    var item = null;
+    for(var i=0;i<FRANCES_DATA.length;i++){ if(FRANCES_DATA[i].fr === frWord){ item = FRANCES_DATA[i]; break; } }
+    if(!item){ removeFromFallosFrances(frWord); nextFrancesRepaso(); return; }
+    state.current = buildFrancesQuestion(item);
+    renderFrancesQuestion();
+  }
+
+  function renderFrancesContrarrelojIntro(){
+    els.gameCard.innerHTML = '<div class="summary">'
+      + '<span class="num">⏱️</span>'
+      + '<p>60 segundos de vocabulario de francés.<br>Tu récord: <b>'+mejorContrarrelojFrances+'</b></p>'
+      + '<button class="primary-btn" id="startRoundBtn">Empezar</button>'
+      + '</div>';
+    document.getElementById("startRoundBtn").addEventListener("click", function(){ startRound(60); });
+  }
+  function endFrancesContrarrelojRound(){
+    if(state.roundScore > mejorContrarrelojFrances){
+      mejorContrarrelojFrances = state.roundScore;
+      saveJSON(BEST_FR_KEY, mejorContrarrelojFrances);
+    }
+    var esRecord = state.roundScore === mejorContrarrelojFrances && state.roundScore > 0;
+    els.gameCard.innerHTML = '<div class="summary">'
+      + '<span class="num">'+state.roundScore+'</span>'
+      + '<p>'+(esRecord ? "¡Nuevo récord! 🏆" : "Aciertos en 60 segundos")+'</p>'
+      + '<p>Tu mejor marca: '+mejorContrarrelojFrances+'</p>'
+      + '<button class="primary-btn" id="retryRoundBtn">Otra vez</button>'
+      + '</div>';
+    document.getElementById("retryRoundBtn").addEventListener("click", function(){ startRound(60); });
+    updateHint();
+  }
+
   /* ---------------- Arranque (con soporte para republicaciones en caliente) ---------------- */
   function start(saved){
+    var validSubject = false;
     if(saved && typeof saved === "object"){
       if(Array.isArray(saved.selectedTables) && saved.selectedTables.length) state.selectedTables = saved.selectedTables;
       if(typeof saved.streak === "number") state.streak = saved.streak;
       if(typeof saved.stars === "number") state.stars = saved.stars;
       if(typeof saved.mode === "string") state.mode = saved.mode;
+      validSubject = SUBJECTS.some(function(s){ return s.id === saved.subject; });
     }
     renderTablesPicker();
     renderMasteryStrip();
+    renderSubjectMenu();
     els.streakVal.textContent = state.streak;
     els.starsVal.textContent = state.stars;
-    setMode(state.mode);
+
+    if(saved && saved.view === "subject" && validSubject){
+      enterSubject(saved.subject);
+      setMode(state.mode);
+    }else{
+      showMenu();
+    }
 
     try{
       if(window.claude && window.claude.hot && window.claude.hot.snapshot){
         window.claude.hot.snapshot(function(){
           var restoreMode = (state.mode === "contrarreloj" || state.mode === "torneo") ? "practica" : state.mode;
-          return { selectedTables: state.selectedTables, streak: state.streak, stars: state.stars, mode: restoreMode };
+          var inSubject = !els.subjectView.hidden;
+          return {
+            selectedTables: state.selectedTables,
+            streak: state.streak,
+            stars: state.stars,
+            mode: restoreMode,
+            subject: state.subject,
+            view: inSubject ? "subject" : "menu"
+          };
         });
       }
     }catch(e){ /* no pasa nada si no está disponible */ }
@@ -1313,13 +1891,13 @@
   }
 })();
 </script>
+
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", function(){
-    navigator.serviceWorker.register("sw.js").catch(function(){ /* sin service worker, la app sigue funcionando igual */ });
+    navigator.serviceWorker.register("./sw.js").catch(function(){ /* sin red la primera vez: no pasa nada */ });
   });
 }
 </script>
-
 </body>
 </html>
