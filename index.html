@@ -757,8 +757,33 @@
     {id:"mesa", label:"Mesa y cocina"},
     {id:"dia", label:"Comidas del día"}
   ];
-  var ACCENT_CHARS = ["é","è","ê","ë","î","ï","ô","û","ù","ç","œ"];
+  var ACCENT_CHARS = ["â","é","è","ê","ë","î","ï","ô","û","ù","ç","œ"];
   var EXAM_LENGTH = 15; // preguntas por examen (menos si la categoría elegida tiene menos palabras)
+
+  /* =========================================================
+     Gramática de francés (Unité 3): artículos partitivos
+     (du/de la/de l'/des) y conjugación de "manger"/"boire" en
+     je/tu/il-elle, tal y como viene en el libro. No es vocabulario
+     nuevo, así que solo entran en juego cuando la categoría
+     "Comida" está activa (son los alimentos con los que se usan
+     estos artículos y verbos en el libro).
+     ========================================================= */
+  var PARTITIVO_DATA = [
+    {fr:"fromage", partitivo:"du fromage", es:"queso", drink:false},
+    {fr:"pain", partitivo:"du pain", es:"pan", drink:false},
+    {fr:"lait", partitivo:"du lait", es:"leche", drink:true},
+    {fr:"confiture", partitivo:"de la confiture", es:"mermelada", drink:false},
+    {fr:"eau", partitivo:"de l'eau", es:"agua", drink:true},
+    {fr:"pâtes", partitivo:"des pâtes", es:"pasta", drink:false},
+    {fr:"tomates", partitivo:"des tomates", es:"tomates", drink:false}
+  ];
+  var VERBOS_DATA = [
+    {inf:"manger", je:"mange", tu:"manges", il:"mange"},
+    {inf:"boire", je:"bois", tu:"bois", il:"boit"}
+  ];
+  var PRONOMBRES = ["je","tu","il","elle"];
+  function pronombreLabel(p){ return p === "je" ? "Je" : (p === "tu" ? "Tu" : (p === "il" ? "Il" : "Elle")); }
+  function formaVerbo(v, p){ return (p === "il" || p === "elle") ? v.il : v[p]; }
 
   /* =========================================================
      Asignaturas disponibles desde el menú principal. Para añadir
@@ -1064,11 +1089,14 @@
 
   function updateHint(){
     if(state.subject === "frances"){
+      var incluyeGramaticaHint = state.francesCategories.indexOf("comida") !== -1;
       if(state.mode === "aprender") els.hint.textContent = "Sin preguntas todavía: lee cada palabra, escúchala y pasa a la siguiente cuando ya te la sepas.";
-      else if(state.mode === "practica") els.hint.textContent = "A veces te pide el significado, a veces escribirla en francés y a veces solo el artículo correcto. Todo de memoria.";
+      else if(state.mode === "practica") els.hint.textContent = incluyeGramaticaHint
+        ? "A veces te pide el significado, escribir la palabra, el artículo, el artículo partitivo (du/de la/de l'/des) o conjugar manger/boire. Todo de memoria."
+        : "A veces te pide el significado, a veces escribirla en francés y a veces solo el artículo correcto. Todo de memoria.";
       else if(state.mode === "dictado") els.hint.textContent = "Escucha la palabra y escríbela con su artículo, tal y como la oigas.";
-      else if(state.mode === "contrarreloj") els.hint.textContent = "60 segundos de vocabulario. ¡A por tu récord: " + mejorContrarrelojFrances + "!";
-      else if(state.mode === "examen") els.hint.textContent = "Examen de " + EXAM_LENGTH + " preguntas sin pistas, para practicar como si fuera de verdad.";
+      else if(state.mode === "contrarreloj") els.hint.textContent = "60 segundos de vocabulario" + (incluyeGramaticaHint ? " y gramática" : "") + ". ¡A por tu récord: " + mejorContrarrelojFrances + "!";
+      else if(state.mode === "examen") els.hint.textContent = "Examen de " + examPoolSize() + " preguntas sin pistas, para practicar como si fuera de verdad.";
       else els.hint.textContent = "Aquí aparecen las palabras de francés que fallaste, para repasarlas (las que más fallas salen más).";
       return;
     }
@@ -1711,7 +1739,7 @@
   function normalizeFr(s){
     var t = String(s).toLowerCase().trim();
     t = t.replace(/[.,!?]/g, "");
-    t = t.replace(/-/g, " ");
+    t = t.replace(/[-'’]/g, " "); // "de l'eau" y "de l eau" deben contar igual
     t = t.replace(/\s+/g, " ");
     return t;
   }
@@ -1728,9 +1756,45 @@
     }
     return { dir: dir, item: item, prompt: dir === "fr2es" ? item.fr : item.es[0] };
   }
+  // Artículos partitivos (du/de la/de l'/des): se le da el alimento pelado
+  // y tiene que escribir el artículo partitivo correcto pegado a la
+  // palabra, tal y como pide el libro.
+  function buildPartitivoQuestion(){
+    var w = pick(PARTITIVO_DATA);
+    return { dir: "partitivo", item: { fr: w.partitivo, es: [w.es] }, prompt: w.fr };
+  }
+  // Conjugación de manger/boire en je/tu/il/elle (las únicas personas que
+  // trae el libro en Unité 3).
+  function buildConjugacionQuestion(){
+    var v = pick(VERBOS_DATA);
+    var p = pick(PRONOMBRES);
+    var forma = formaVerbo(v, p);
+    return { dir: "conjugacion", item: { fr: forma, es: [""] }, prompt: pronombreLabel(p) + " ___ (" + v.inf + ")" };
+  }
+  // Frase completa: junta pronombre + verbo conjugado + artículo partitivo,
+  // emparejando boire con bebidas y manger con el resto, como en el libro.
+  function buildFraseQuestion(){
+    var v = pick(VERBOS_DATA);
+    var candidatos = PARTITIVO_DATA.filter(function(w){ return w.drink === (v.inf === "boire"); });
+    var w = pick(candidatos.length ? candidatos : PARTITIVO_DATA);
+    var p = pick(PRONOMBRES);
+    var forma = formaVerbo(v, p);
+    var frase = pronombreLabel(p) + " " + forma + " " + w.partitivo + ".";
+    return { dir: "frase", item: { fr: frase, es: [""] }, prompt: pronombreLabel(p) + " / " + v.inf + " / " + w.fr };
+  }
   function generateFrancesPregunta(){
     var pool = francesPool();
     if(!pool.length) pool = FRANCES_DATA;
+    // La gramática de Unité 3 (partitivos y manger/boire) solo entra en
+    // juego cuando la categoría Comida está activa, porque es con esos
+    // alimentos con los que el libro la trabaja.
+    var incluyeGramatica = state.francesCategories.indexOf("comida") !== -1;
+    if(incluyeGramatica && Math.random() < 0.3){
+      var tipo = pick(["partitivo", "conjugacion", "frase"]);
+      if(tipo === "partitivo") return buildPartitivoQuestion();
+      if(tipo === "conjugacion") return buildConjugacionQuestion();
+      return buildFraseQuestion();
+    }
     return buildFrancesQuestion(pick(pool));
   }
   // Dictado: no se ve la palabra escrita, solo se oye (o, si el dispositivo
@@ -1767,7 +1831,17 @@
     if(q.dir === "dictado") return "Escucha y escribe";
     if(q.dir === "fr2es") return "¿Qué significa?";
     if(q.dir === "articulo") return "Escribe la palabra con su artículo";
+    if(q.dir === "partitivo") return "Escribe con su artículo partitivo (du/de la/de l'/des)";
+    if(q.dir === "conjugacion") return "Conjuga el verbo";
+    if(q.dir === "frase") return "Construye la frase completa";
     return "Escribe en francés";
+  }
+  function fracesPlaceholder(q){
+    if(q.dir === "fr2es") return "Escribe el significado";
+    if(q.dir === "partitivo") return "du / de la / de l' / des + palabra";
+    if(q.dir === "conjugacion") return "La forma conjugada";
+    if(q.dir === "frase") return "La frase completa";
+    return "Escribe la palabra en francés";
   }
 
   function renderFrancesQuestion(){
@@ -1797,7 +1871,7 @@
         + (q.dir === "fr2es" && ttsOk ? '<button type="button" class="speaker-btn small" id="playPromptBtn" aria-label="Escuchar">🔊</button>' : '');
     }
     html += '</div>'
-      + '<input class="frances-input" id="fracesInput" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="'+(q.dir==="fr2es" ? "Escribe el significado" : "Escribe la palabra en francés")+'">'
+      + '<input class="frances-input" id="fracesInput" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="'+fracesPlaceholder(q)+'">'
       + (q.dir !== "fr2es" ? '<div class="accent-row" id="accentRow">' + ACCENT_CHARS.map(function(c){ return '<button type="button" class="accent-btn" data-ch="'+c+'">'+c+'</button>'; }).join('') + '</div>' : '')
       + '<button class="primary-btn" id="checkFrancesBtn">Comprobar ✓</button>'
       + '<p class="feedback" id="feedback"></p>';
@@ -1887,10 +1961,17 @@
     Array.prototype.forEach.call(document.querySelectorAll(".accent-btn"), function(b){ b.disabled = true; });
     showResultMark(ok);
 
-    var stats = regFrances(q.item.fr);
-    stats.total++;
-    if(ok) stats.correct++;
-    saveJSON(PROGRESO_FR_KEY, progresoFrances);
+    // La gramática (partitivo/conjugación/frase) no es una palabra de
+    // FRANCES_DATA: no lleva mastery por tabla ni entra en "Fallos" (ese
+    // repaso busca la palabra en FRANCES_DATA y no la encontraría), así
+    // que esas dos cosas solo se tocan para preguntas de vocabulario.
+    var esGramatica = (q.dir === "partitivo" || q.dir === "conjugacion" || q.dir === "frase");
+    if(!esGramatica){
+      var stats = regFrances(q.item.fr);
+      stats.total++;
+      if(ok) stats.correct++;
+      saveJSON(PROGRESO_FR_KEY, progresoFrances);
+    }
     if(state.mode === "examen" && ok) state.examScore++;
 
     var fb = document.getElementById("feedback");
@@ -1900,17 +1981,17 @@
       if(state.roundActive) state.roundScore++;
       fb.textContent = pick(["¡Genial!","¡Eso es!","¡Muy bien!","¡Perfecto!","¡Sigue así!"]);
       fb.className = "feedback good";
-      removeFromFallosFrances(q.item.fr);
+      if(!esGramatica) removeFromFallosFrances(q.item.fr);
     }else{
       state.streak = 0;
       var correcta = (q.dir === "fr2es") ? q.item.es[0] : q.item.fr;
       fb.textContent = "Era: " + correcta + ". ¡A por la siguiente!";
       fb.className = "feedback bad";
-      addToFallosFrances(q.item.fr);
+      if(!esGramatica) addToFallosFrances(q.item.fr);
     }
     // Para "articulo"/"es2fr" (donde la palabra en francés no se ha visto
     // escrita en pantalla, solo tecleada) se ofrece oírla al revisar.
-    if((q.dir === "articulo" || q.dir === "es2fr") && ("speechSynthesis" in window)){
+    if((q.dir === "articulo" || q.dir === "es2fr" || q.dir === "partitivo" || q.dir === "conjugacion" || q.dir === "frase") && ("speechSynthesis" in window)){
       var listenBtn = document.createElement("button");
       listenBtn.type = "button";
       listenBtn.className = "speaker-btn small";
@@ -2011,10 +2092,18 @@
      en condiciones parecidas a como se lo van a preguntar de verdad. No
      usa el motor de startRound()/endRound() (que es para rondas a tiempo)
      sino un índice propio que avanza pregunta a pregunta. */
+  // Si la categoría Comida está activa, el examen reserva un puñado de
+  // preguntas para la gramática de Unité 3 (partitivos y manger/boire) y
+  // el resto son vocabulario, igual que en el libro se mezclan los dos.
+  function examGramCount(){
+    return (state.francesCategories.indexOf("comida") !== -1) ? Math.min(5, EXAM_LENGTH) : 0;
+  }
   function examPoolSize(){
     var pool = francesPool();
     if(!pool.length) pool = FRANCES_DATA;
-    return Math.min(EXAM_LENGTH, pool.length);
+    var gramCount = examGramCount();
+    var vocabCount = Math.min(EXAM_LENGTH - gramCount, pool.length);
+    return vocabCount + gramCount;
   }
   function renderExamIntro(){
     var n = examPoolSize();
@@ -2028,12 +2117,18 @@
   function startExam(){
     var pool = francesPool();
     if(!pool.length) pool = FRANCES_DATA;
-    var n = Math.min(EXAM_LENGTH, pool.length);
+    var gramCount = examGramCount();
+    var vocabCount = Math.min(EXAM_LENGTH - gramCount, pool.length);
     var shuffled = pool.slice().sort(function(){ return Math.random() - 0.5; });
-    state.examQuestions = [];
-    for(var i=0;i<n;i++){
-      state.examQuestions.push(buildFrancesQuestion(shuffled[i]));
+    var qs = [];
+    for(var i=0;i<vocabCount;i++){
+      qs.push(buildFrancesQuestion(shuffled[i]));
     }
+    for(var g=0; g<gramCount; g++){
+      var tipo = pick(["partitivo", "conjugacion", "frase"]);
+      qs.push(tipo === "partitivo" ? buildPartitivoQuestion() : (tipo === "conjugacion" ? buildConjugacionQuestion() : buildFraseQuestion()));
+    }
+    state.examQuestions = qs.sort(function(){ return Math.random() - 0.5; });
     state.examIndex = 0;
     state.examScore = 0;
     renderExamQuestion();
