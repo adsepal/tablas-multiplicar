@@ -1190,6 +1190,23 @@
     els.gameCard.appendChild(mark);
   }
 
+  // Al fallar en un modo sin cronómetro no pasamos sola a la siguiente
+  // pregunta: añadimos un botón "Siguiente" y esperamos a que lo toque,
+  // para que le dé tiempo a mirar en qué se ha equivocado. En modos con
+  // cronómetro (contrarreloj/torneo) seguimos avanzando solas, porque ahí
+  // pararse se come el tiempo de la ronda.
+  function appendNextButton(onClick){
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "primary-btn next-btn";
+    btn.textContent = "Siguiente ⟶";
+    btn.addEventListener("click", function(){
+      btn.disabled = true;
+      onClick();
+    });
+    els.gameCard.appendChild(btn);
+  }
+
   function checkAnswer(){
     if(state.answered || state.currentInput === "") return;
     state.answered = true;
@@ -1225,12 +1242,15 @@
     els.starsVal.textContent = state.stars;
     renderMasteryStrip();
 
-    var delay = ok ? 700 : 1800;
-    setTimeout(function(){
-      if(state.roundActive || (state.mode !== "contrarreloj" && state.mode !== "torneo")){
-        next();
-      }
-    }, delay);
+    if(state.roundActive){
+      // Contrarreloj/Torneo: la ronda sigue a su ritmo pase lo que pase.
+      setTimeout(function(){ next(); }, ok ? 700 : 1800);
+    }else if(ok){
+      setTimeout(function(){ next(); }, 700);
+    }else{
+      // Fallo en modo sin cronómetro: esperamos a que toque "Siguiente".
+      appendNextButton(next);
+    }
   }
 
   /* ---------------- Fallos guardados ---------------- */
@@ -1904,16 +1924,17 @@
     els.starsVal.textContent = state.stars;
     renderFrancesMasteryStrip();
 
-    var delay = ok ? 900 : 2400; // un poco más de tiempo para leer bien la palabra escrita
-    setTimeout(function(){
-      if(state.mode === "examen"){
-        advanceExam();
-        return;
-      }
-      if(state.roundActive || state.mode !== "contrarreloj"){
-        next();
-      }
-    }, delay);
+    var advance = (state.mode === "examen") ? advanceExam : next;
+    if(state.roundActive){
+      // Contrarreloj: la ronda sigue a su ritmo pase lo que pase.
+      setTimeout(function(){ advance(); }, ok ? 900 : 2400);
+    }else if(ok){
+      setTimeout(function(){ advance(); }, 900);
+    }else{
+      // Fallo en modo sin cronómetro (incluido el examen): esperamos a que
+      // toque "Siguiente", para que le dé tiempo a ver en qué falló.
+      appendNextButton(advance);
+    }
   }
 
   function addToFallosFrances(frWord){
