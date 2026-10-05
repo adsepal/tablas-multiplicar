@@ -305,6 +305,18 @@
     line-height:1.25;
     padding:0 6px;
   }
+  .fr-meaning{
+    font-size:18px;
+    font-weight:700;
+    color:var(--text-soft);
+    margin-top:10px;
+  }
+  .aprender-count{
+    font-size:13px;
+    font-weight:700;
+    color:var(--text-soft);
+    margin-top:14px;
+  }
   .frances-input{
     display:block;
     width:100%;
@@ -344,36 +356,19 @@
   .accent-btn:active{transform:scale(.92);}
   .accent-btn[disabled]{opacity:.5;cursor:default;transform:none;}
 
-  .gender-choice{
-    display:flex;
-    gap:10px;
-    justify-content:center;
-    max-width:320px;
-    margin:0 auto;
-    width:100%;
-  }
-  .gender-btn{
-    flex:1;
-    display:flex;
-    flex-direction:column;
+  .speaker-btn{
+    display:inline-flex;
     align-items:center;
-    gap:4px;
+    justify-content:center;
     background:var(--bg-sunken);
-    border:2px solid transparent;
-    border-radius:16px;
-    padding:16px 8px;
-    font-weight:800;
-    font-size:15px;
-    color:var(--text);
+    border:1px solid var(--border);
+    border-radius:999px;
     cursor:pointer;
+    color:var(--text);
   }
-  .gender-btn:active{transform:scale(.96);}
-  .gender-btn .gender-sub{font-weight:700;font-size:12px;color:var(--text-soft);}
-  .gender-btn[disabled]{opacity:.65;cursor:default;transform:none;}
-  .gender-btn.correct{background:var(--success-soft);border-color:var(--success);color:var(--success);}
-  .gender-btn.correct .gender-sub{color:var(--success);}
-  .gender-btn.wrong{background:var(--wrong-soft);border-color:var(--wrong);color:var(--wrong);}
-  .gender-btn.wrong .gender-sub{color:var(--wrong);}
+  .speaker-btn:active{transform:scale(.92);}
+  .speaker-btn.small{width:32px;height:32px;font-size:15px;margin:8px auto 0;}
+  .speaker-btn.big{width:88px;height:88px;font-size:38px;margin:4px auto 0;box-shadow:0 8px 20px -10px var(--shadow);}
 
   .keypad{
     display:grid;
@@ -589,6 +584,7 @@
   .mastery-pill.m-mid{background:var(--warn-soft);color:var(--warn-ink);}
   .mastery-pill.m-high{background:var(--success-soft);color:var(--success);}
   .mastery-pill.picked{outline:2px solid var(--accent);outline-offset:1px;}
+  .mastery-3{grid-template-columns:repeat(3,1fr);}
 
   .hint{
     text-align:center;
@@ -668,6 +664,7 @@
   var SHARE_BEST_KEY = "tablas-torneo-compartir-mejor-v1";
   var FALLOS_FR_KEY  = "tablas-fallos-frances-v1";
   var BEST_FR_KEY    = "tablas-mejor-contrarreloj-frances-v1";
+  var PROGRESO_FR_KEY = "tablas-progreso-frances-v1";
 
   function loadJSON(key, fallback){
     try{
@@ -684,12 +681,22 @@
   var mejorContrarreloj = loadJSON(BEST_KEY, 0);
   var torneo = loadJSON(TORNEO_KEY, {}); // { "nombre en minúsculas": {name, best, games} } — clasificación local, se juega pasando el móvil
   var mejorTorneoCompartir = loadJSON(SHARE_BEST_KEY, 0); // mejor marca de este móvil en el modo "cada una con el suyo"
-  var fallosFrances = loadJSON(FALLOS_FR_KEY, []); // [ "le poisson", ... ] — palabras francesas falladas
+  // [{fr:"le poisson", count:2, lastWrong:169...}, ...] — palabras falladas,
+  // con cuántas veces se han fallado para repasar más las que más cuestan.
+  // Si venía del formato antiguo (solo strings), se adapta sola al cargar.
+  var fallosFrances = loadJSON(FALLOS_FR_KEY, []).map(function(f){
+    return (typeof f === "string") ? {fr:f, count:1, lastWrong:Date.now()} : f;
+  });
   var mejorContrarrelojFrances = loadJSON(BEST_FR_KEY, 0);
+  var progresoFrances = loadJSON(PROGRESO_FR_KEY, {}); // { "le poisson": {correct:3,total:5}, ... }
 
   function regTable(t){
     if(!progreso[t]) progreso[t] = {correct:0, total:0};
     return progreso[t];
+  }
+  function regFrances(word){
+    if(!progresoFrances[word]) progresoFrances[word] = {correct:0, total:0};
+    return progresoFrances[word];
   }
 
   /* =========================================================
@@ -746,12 +753,12 @@
     {fr:"le dîner", es:["la cena"], cat:"dia", g:"m"}
   ];
   var FR_CATS = [
-    {id:"todas", label:"Todas"},
     {id:"comida", label:"Comida"},
     {id:"mesa", label:"Mesa y cocina"},
     {id:"dia", label:"Comidas del día"}
   ];
   var ACCENT_CHARS = ["é","è","ê","ë","î","ï","ô","û","ù","ç","œ"];
+  var EXAM_LENGTH = 15; // preguntas por examen (menos si la categoría elegida tiene menos palabras)
 
   /* =========================================================
      Asignaturas disponibles desde el menú principal. Para añadir
@@ -761,7 +768,7 @@
      ========================================================= */
   var SUBJECTS = [
     {id:"tablas", icon:"🔢", title:"Tablas de multiplicar", sub:"Practica las multiplicaciones de memoria"},
-    {id:"frances", icon:"🇫🇷", title:"Francés — Vocabulario", sub:"Significado, escritura y género de las palabras"}
+    {id:"frances", icon:"🇫🇷", title:"Francés — Vocabulario", sub:"Significado, escritura con artículo y dictado"}
   ];
 
   /* =========================================================
@@ -771,8 +778,8 @@
      ========================================================= */
   var state = {
     subject: null,             // tablas | frances | null (en el menú)
-    francesCategory: "todas", // todas | comida | mesa | dia
-    mode: "practica",         // practica | contrarreloj | repaso | torneo
+    francesCategories: ["comida","mesa","dia"], // categorías activas (varias a la vez)
+    mode: "practica",         // practica | aprender | dictado | contrarreloj | repaso | torneo | examen
     selectedTables: [1,2,3,4,5,6,7,8,9,10],
     streak: 0,
     stars: 0,
@@ -785,7 +792,12 @@
     roundScore: 0,
     roundActive: false,
     playerName: "",           // nombre de la jugadora actual en el modo Torneo
-    torneoSubmode: null       // null | "movil" | "compartir" — cómo se juega el Torneo
+    torneoSubmode: null,      // null | "movil" | "compartir" — cómo se juega el Torneo
+    examQuestions: [],        // preguntas fijas del examen en curso
+    examIndex: 0,
+    examScore: 0,
+    aprenderDeck: [],         // tarjetas (sin preguntar) del modo "Aprender", en orden aleatorio
+    aprenderIndex: 0
   };
 
   /* =========================================================
@@ -876,32 +888,86 @@
   els.masteryStrip.addEventListener("click", function(e){
     var btn = e.target.closest(".mastery-pill");
     if(!btn) return;
-    state.selectedTables = [parseInt(btn.getAttribute("data-table"),10)];
+    if(state.subject === "frances"){
+      var cat = btn.getAttribute("data-cat");
+      if(!cat) return;
+      if(state.francesCategories.length === 1 && state.francesCategories[0] === cat){
+        state.francesCategories = FR_CATS.map(function(c){ return c.id; }); // toca otra vez para volver a "todas"
+      }else{
+        state.francesCategories = [cat];
+      }
+      syncCategoryPickerUI();
+      renderFrancesMasteryStrip();
+      if(state.mode === "practica" || state.mode === "dictado") next();
+      else if(state.mode === "aprender") startAprender();
+      return;
+    }
+    var t = btn.getAttribute("data-table");
+    if(!t) return;
+    state.selectedTables = [parseInt(t,10)];
     syncTablesPickerUI();
     renderMasteryStrip();
     if(state.mode === "practica") next();
   });
 
-  /* ---------------- Categorías de vocabulario (francés) ---------------- */
-  function renderCategoryPicker(){
+  /* ---------------- Tira de progreso por categoría (francés) ---------------- */
+  function renderFrancesMasteryStrip(){
     var html = FR_CATS.map(function(c){
-      return '<button class="chip" data-cat="'+c.id+'">'+c.label+'</button>';
+      var correct = 0, total = 0;
+      FRANCES_DATA.forEach(function(w){
+        if(w.cat !== c.id) return;
+        var d = progresoFrances[w.fr];
+        if(d){ correct += d.correct; total += d.total; }
+      });
+      var pct = total ? Math.round((correct/total)*100) : 0;
+      var cls = "m-low";
+      if(pct >= 80) cls = "m-high"; else if(pct >= 40) cls = "m-mid";
+      var picked = (state.francesCategories.length===1 && state.francesCategories[0]===c.id) ? " picked" : "";
+      return '<button class="mastery-pill '+cls+picked+'" data-cat="'+c.id+'" title="'+escapeHTML(c.label)+': '+pct+'%">'+escapeHTML(c.label)+'<br>'+pct+'%</button>';
     }).join('');
+    els.masteryStrip.innerHTML = html;
+  }
+
+  /* ---------------- Categorías de vocabulario (francés) ----------------
+     Selección múltiple: cada chip se activa o desactiva por separado, y
+     "Todas" es un atajo para marcarlas todas de golpe. No se puede dejar
+     la selección vacía (si solo queda una activa, tocarla otra vez no
+     hace nada, para no quedarse sin palabras con las que practicar). */
+  function francesPool(){
+    return FRANCES_DATA.filter(function(w){ return state.francesCategories.indexOf(w.cat) !== -1; });
+  }
+  function renderCategoryPicker(){
+    var html = '<button class="chip" data-cat="todas">Todas</button>'
+      + FR_CATS.map(function(c){
+          return '<button class="chip" data-cat="'+c.id+'">'+c.label+'</button>';
+        }).join('');
     els.categoryPicker.innerHTML = html;
     syncCategoryPickerUI();
   }
   function syncCategoryPickerUI(){
+    var allOn = FR_CATS.every(function(c){ return state.francesCategories.indexOf(c.id) !== -1; });
     Array.prototype.forEach.call(els.categoryPicker.querySelectorAll(".chip"), function(chip){
-      chip.classList.toggle("active", chip.getAttribute("data-cat") === state.francesCategory);
+      var cat = chip.getAttribute("data-cat");
+      chip.classList.toggle("active", cat === "todas" ? allOn : state.francesCategories.indexOf(cat) !== -1);
     });
   }
   els.categoryPicker.addEventListener("click", function(e){
     var btn = e.target.closest(".chip");
     if(!btn) return;
-    state.francesCategory = btn.getAttribute("data-cat");
+    var cat = btn.getAttribute("data-cat");
+    if(cat === "todas"){
+      state.francesCategories = FR_CATS.map(function(c){ return c.id; });
+    }else{
+      var idx = state.francesCategories.indexOf(cat);
+      if(idx === -1) state.francesCategories.push(cat);
+      else if(state.francesCategories.length > 1) state.francesCategories.splice(idx,1);
+    }
     syncCategoryPickerUI();
-    if(!state.roundActive && state.mode === "practica"){
+    renderFrancesMasteryStrip();
+    if(!state.roundActive && (state.mode === "practica" || state.mode === "dictado")){
       next();
+    }else if(state.mode === "aprender"){
+      startAprender();
     }
   });
 
@@ -938,17 +1004,24 @@
   function renderSubjectUI(){
     var isFrances = state.subject === "frances";
     els.tablesPicker.hidden = isFrances;
-    els.masteryStrip.hidden = isFrances;
     els.categoryPicker.hidden = !isFrances;
-    if(isFrances) renderCategoryPicker();
+    els.masteryStrip.classList.toggle("mastery-3", isFrances);
+    if(isFrances){
+      renderCategoryPicker();
+      renderFrancesMasteryStrip();
+    }else{
+      renderMasteryStrip();
+    }
     renderModesNav();
   }
   function renderModesNav(){
     var isFrances = state.subject === "frances";
-    var html = '<button class="mode-btn" data-mode="practica" role="tab">Práctica</button>'
+    var html = (isFrances ? '<button class="mode-btn" data-mode="aprender" role="tab">Aprender</button>' : '')
+      + '<button class="mode-btn" data-mode="practica" role="tab">Práctica</button>'
+      + (isFrances ? '<button class="mode-btn" data-mode="dictado" role="tab">Dictado</button>' : '')
       + '<button class="mode-btn" data-mode="contrarreloj" role="tab">Contrarreloj</button>'
       + '<button class="mode-btn" data-mode="repaso" role="tab">Fallos</button>'
-      + (isFrances ? '' : '<button class="mode-btn" data-mode="torneo" role="tab">Torneo</button>');
+      + (isFrances ? '<button class="mode-btn" data-mode="examen" role="tab">Examen</button>' : '<button class="mode-btn" data-mode="torneo" role="tab">Torneo</button>');
     els.modes.innerHTML = html;
     els.modes.classList.toggle("modes-3", isFrances);
     syncModeButtonsUI();
@@ -979,6 +1052,10 @@
     }else if(mode === "torneo"){
       state.torneoSubmode = null;
       renderTorneoIntro();
+    }else if(mode === "examen"){
+      renderExamIntro();
+    }else if(mode === "aprender"){
+      startAprender();
     }else{
       next();
     }
@@ -987,9 +1064,12 @@
 
   function updateHint(){
     if(state.subject === "frances"){
-      if(state.mode === "practica") els.hint.textContent = "A veces te pide el significado, a veces escribirla en francés y a veces si es masculino o femenino. Todo de memoria.";
+      if(state.mode === "aprender") els.hint.textContent = "Sin preguntas todavía: lee cada palabra, escúchala y pasa a la siguiente cuando ya te la sepas.";
+      else if(state.mode === "practica") els.hint.textContent = "A veces te pide el significado, a veces escribirla en francés y a veces solo el artículo correcto. Todo de memoria.";
+      else if(state.mode === "dictado") els.hint.textContent = "Escucha la palabra y escríbela con su artículo, tal y como la oigas.";
       else if(state.mode === "contrarreloj") els.hint.textContent = "60 segundos de vocabulario. ¡A por tu récord: " + mejorContrarrelojFrances + "!";
-      else els.hint.textContent = "Aquí aparecen las palabras de francés que fallaste, para repasarlas.";
+      else if(state.mode === "examen") els.hint.textContent = "Examen de " + EXAM_LENGTH + " preguntas sin pistas, para practicar como si fuera de verdad.";
+      else els.hint.textContent = "Aquí aparecen las palabras de francés que fallaste, para repasarlas (las que más fallas salen más).";
       return;
     }
     if(state.mode === "practica") els.hint.textContent = "Escribe el resultado de memoria y pulsa ✓. Puedes elegir una sola tabla arriba.";
@@ -1009,7 +1089,12 @@
         nextFrancesRepaso();
         return;
       }
-      state.current = generateFrancesPregunta(state.francesCategory);
+      if(state.mode === "dictado"){
+        state.current = generateDictadoPregunta();
+        renderFrancesQuestion();
+        return;
+      }
+      state.current = generateFrancesPregunta();
       renderFrancesQuestion();
       return;
     }
@@ -1612,26 +1697,40 @@
   }
 
   // El artículo (le/la/un/une/les) va pegado a la palabra en FRANCES_DATA
-  // porque eso es lo que tiene que escribir de memoria. "les" (plural) no
-  // revela género, así que esas palabras no entran en la pregunta de género.
-  function articleOf(fr){
-    var m = fr.match(/^(le|la|un|une|les)\s/);
-    return m ? m[1] : null;
-  }
+  // porque eso es justo lo que tiene que escribir de memoria. La dirección
+  // "articulo" le enseña la palabra pelada (sin artículo) y ella tiene que
+  // reconstruir "le/la/un/une/les + palabra" — así el género (y el plural
+  // de las "les...") se demuestra escribiendo, no adivinando con botones.
   function buildFrancesQuestion(item){
-    var art = articleOf(item.fr);
-    var dirs = ["fr2es", "es2fr"];
-    if(art && art !== "les") dirs.push("genero");
-    var dir = pick(dirs);
-    if(dir === "genero"){
-      return { dir: "genero", item: item, prompt: item.fr.replace(/^(le|la|un|une)\s+/, "") };
+    var dir = pick(["fr2es", "es2fr", "articulo"]);
+    if(dir === "articulo"){
+      return { dir: "articulo", item: item, prompt: item.fr.replace(/^(le|la|un|une|les)\s+/, "") };
     }
     return { dir: dir, item: item, prompt: dir === "fr2es" ? item.fr : item.es[0] };
   }
-  function generateFrancesPregunta(cat){
-    var pool = (cat === "todas") ? FRANCES_DATA : FRANCES_DATA.filter(function(w){ return w.cat === cat; });
+  function generateFrancesPregunta(){
+    var pool = francesPool();
     if(!pool.length) pool = FRANCES_DATA;
     return buildFrancesQuestion(pick(pool));
+  }
+  // Dictado: no se ve la palabra escrita, solo se oye (o, si el dispositivo
+  // no puede leer en voz alta, se ve como último recurso para que el
+  // ejercicio no se quede bloqueado).
+  function generateDictadoPregunta(){
+    var pool = francesPool();
+    if(!pool.length) pool = FRANCES_DATA;
+    return { dir: "dictado", item: pick(pool), prompt: "" };
+  }
+  function speakFrench(text){
+    try{
+      if(!("speechSynthesis" in window)) return false;
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = "fr-FR";
+      u.rate = 0.85;
+      window.speechSynthesis.speak(u);
+      return true;
+    }catch(e){ return false; }
   }
 
   function insertAtCursor(input, text){
@@ -1644,42 +1743,42 @@
     input.focus();
   }
 
+  function frQuestionLabel(q){
+    if(q.dir === "dictado") return "Escucha y escribe";
+    if(q.dir === "fr2es") return "¿Qué significa?";
+    if(q.dir === "articulo") return "Escribe la palabra con su artículo";
+    return "Escribe en francés";
+  }
+
   function renderFrancesQuestion(){
     var q = state.current;
     state.answered = false;
     var timed = (state.mode === "contrarreloj");
+    var isDictado = (q.dir === "dictado");
+    var ttsOk = ("speechSynthesis" in window);
     var html = '';
     if(timed) html += '<div class="timerbar" id="timerBar"><i id="timerFill"></i></div>';
 
-    if(q.dir === "genero"){
-      html += '<div class="question-wrap">'
-        + '<p class="question-sub">'+ (state.mode==="repaso" ? "Repasando un fallo" : "¿Es masculino o femenino?") +'</p>'
-        + '<div class="fr-prompt">'+escapeHTML(q.prompt)+'</div>'
-        + '</div>'
-        + '<div class="gender-choice">'
-        + '<button type="button" class="gender-btn" data-g="m">Masculino<span class="gender-sub">le / un</span></button>'
-        + '<button type="button" class="gender-btn" data-g="f">Femenino<span class="gender-sub">la / une</span></button>'
-        + '</div>'
-        + '<p class="feedback" id="feedback"></p>';
-      els.gameCard.innerHTML = html;
-      if(timed){
-        els.timerBar = document.getElementById("timerBar");
-        els.timerFill = document.getElementById("timerFill");
-      }
-      document.querySelector(".gender-choice").addEventListener("click", function(e){
-        var btn = e.target.closest(".gender-btn");
-        if(!btn || state.answered) return;
-        checkFrancesGenderAnswer(btn.getAttribute("data-g"));
-      });
-      return;
-    }
+    var subLabel = (state.mode === "repaso") ? "Repasando un fallo"
+      : (state.mode === "examen") ? ("Pregunta "+(state.examIndex+1)+"/"+state.examQuestions.length+" · "+frQuestionLabel(q))
+      : frQuestionLabel(q);
 
     html += '<div class="question-wrap">'
-      + '<p class="question-sub">'+ (state.mode==="repaso" ? "Repasando un fallo" : (q.dir==="fr2es" ? "¿Qué significa?" : "Escribe en francés")) +'</p>'
-      + '<div class="fr-prompt">'+escapeHTML(q.prompt)+'</div>'
-      + '</div>'
+      + '<p class="question-sub">'+subLabel+'</p>';
+    if(isDictado){
+      if(ttsOk){
+        html += '<button type="button" class="speaker-btn big" id="playDictadoBtn" aria-label="Escuchar la palabra">🔊</button>';
+      }else{
+        html += '<div class="fr-prompt">'+escapeHTML(q.item.fr)+'</div>'
+          + '<p class="hint" style="margin-top:4px">(Tu dispositivo no puede leerlo en voz alta ahora, pero puedes copiarla)</p>';
+      }
+    }else{
+      html += '<div class="fr-prompt">'+escapeHTML(q.prompt)+'</div>'
+        + (q.dir === "fr2es" && ttsOk ? '<button type="button" class="speaker-btn small" id="playPromptBtn" aria-label="Escuchar">🔊</button>' : '');
+    }
+    html += '</div>'
       + '<input class="frances-input" id="fracesInput" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="'+(q.dir==="fr2es" ? "Escribe el significado" : "Escribe la palabra en francés")+'">'
-      + (q.dir === "es2fr" ? '<div class="accent-row" id="accentRow">' + ACCENT_CHARS.map(function(c){ return '<button type="button" class="accent-btn" data-ch="'+c+'">'+c+'</button>'; }).join('') + '</div>' : '')
+      + (q.dir !== "fr2es" ? '<div class="accent-row" id="accentRow">' + ACCENT_CHARS.map(function(c){ return '<button type="button" class="accent-btn" data-ch="'+c+'">'+c+'</button>'; }).join('') + '</div>' : '')
       + '<button class="primary-btn" id="checkFrancesBtn">Comprobar ✓</button>'
       + '<p class="feedback" id="feedback"></p>';
     els.gameCard.innerHTML = html;
@@ -1687,6 +1786,11 @@
       els.timerBar = document.getElementById("timerBar");
       els.timerFill = document.getElementById("timerFill");
     }
+    var playDictadoBtn = document.getElementById("playDictadoBtn");
+    if(playDictadoBtn) playDictadoBtn.addEventListener("click", function(){ speakFrench(q.item.fr); });
+    var playPromptBtn = document.getElementById("playPromptBtn");
+    if(playPromptBtn) playPromptBtn.addEventListener("click", function(){ speakFrench(q.item.fr); });
+
     var input = document.getElementById("fracesInput");
     input.focus();
     input.addEventListener("keydown", function(e){
@@ -1703,41 +1807,46 @@
     }
   }
 
-  function checkFrancesGenderAnswer(ans){
-    if(state.answered) return;
-    state.answered = true;
-    var q = state.current;
-    var ok = ans === q.item.g;
-    Array.prototype.forEach.call(document.querySelectorAll(".gender-btn"), function(b){
-      b.disabled = true;
-      if(b.getAttribute("data-g") === q.item.g) b.classList.add("correct");
-      else if(b.getAttribute("data-g") === ans) b.classList.add("wrong");
+  /* ---------------- Aprender (francés) ----------------
+     Tarjetas sin preguntar nada: se ve la palabra en francés (ya con su
+     artículo), su significado y se puede escuchar, para estudiarlas antes
+     de que el resto de modos empiece a examinar de verdad. */
+  function startAprender(){
+    var pool = francesPool();
+    if(!pool.length) pool = FRANCES_DATA;
+    state.aprenderDeck = pool.slice().sort(function(){ return Math.random() - 0.5; });
+    state.aprenderIndex = 0;
+    renderAprenderCard();
+  }
+  function renderAprenderCard(){
+    var deck = state.aprenderDeck;
+    if(!deck.length){ startAprender(); return; }
+    var item = deck[state.aprenderIndex];
+    var ttsOk = ("speechSynthesis" in window);
+    var isLast = state.aprenderIndex === deck.length - 1;
+    var html = '<div class="question-wrap">'
+      + '<p class="question-sub">Aprender</p>'
+      + '<div class="fr-prompt">'+escapeHTML(item.fr)+'</div>'
+      + (ttsOk ? '<button type="button" class="speaker-btn small" id="playAprenderBtn" aria-label="Escuchar">🔊</button>' : '')
+      + '<p class="fr-meaning">'+escapeHTML(item.es[0])+'</p>'
+      + '<p class="aprender-count">'+(state.aprenderIndex+1)+' de '+deck.length+'</p>'
+      + '</div>'
+      + '<button class="primary-btn" id="aprenderNextBtn">'+(isLast ? 'Empezar otra vuelta ⟲' : 'Siguiente ⟶')+'</button>'
+      + '<button class="ghost-btn" id="aprenderPrevBtn" style="margin-top:8px"'+(state.aprenderIndex===0 ? ' disabled' : '')+'>⟵ Anterior</button>';
+    els.gameCard.innerHTML = html;
+    var playBtn = document.getElementById("playAprenderBtn");
+    if(playBtn) playBtn.addEventListener("click", function(){ speakFrench(item.fr); });
+    document.getElementById("aprenderNextBtn").addEventListener("click", function(){
+      if(isLast){ startAprender(); return; }
+      state.aprenderIndex++;
+      renderAprenderCard();
     });
-    showResultMark(ok);
-
-    var fb = document.getElementById("feedback");
-    if(ok){
-      state.streak++;
-      if(state.streak > 0 && state.streak % 5 === 0) state.stars++;
-      if(state.roundActive) state.roundScore++;
-      fb.textContent = pick(["¡Genial!","¡Eso es!","¡Muy bien!","¡Perfecto!","¡Sigue así!"]);
-      fb.className = "feedback good";
-      removeFromFallosFrances(q.item.fr);
-    }else{
-      state.streak = 0;
-      fb.textContent = "Era " + (q.item.g === "m" ? "masculino (le / un)" : "femenino (la / une)") + ": " + q.item.fr + ". ¡A por la siguiente!";
-      fb.className = "feedback bad";
-      addToFallosFrances(q.item.fr);
-    }
-    els.streakVal.textContent = state.streak;
-    els.starsVal.textContent = state.stars;
-
-    var delay = ok ? 900 : 2400;
-    setTimeout(function(){
-      if(state.roundActive || state.mode !== "contrarreloj"){
-        next();
-      }
-    }, delay);
+    var prevBtn = document.getElementById("aprenderPrevBtn");
+    prevBtn.addEventListener("click", function(){
+      if(state.aprenderIndex === 0) return;
+      state.aprenderIndex--;
+      renderAprenderCard();
+    });
   }
 
   function checkFrancesAnswer(){
@@ -1758,6 +1867,12 @@
     Array.prototype.forEach.call(document.querySelectorAll(".accent-btn"), function(b){ b.disabled = true; });
     showResultMark(ok);
 
+    var stats = regFrances(q.item.fr);
+    stats.total++;
+    if(ok) stats.correct++;
+    saveJSON(PROGRESO_FR_KEY, progresoFrances);
+    if(state.mode === "examen" && ok) state.examScore++;
+
     var fb = document.getElementById("feedback");
     if(ok){
       state.streak++;
@@ -1773,11 +1888,28 @@
       fb.className = "feedback bad";
       addToFallosFrances(q.item.fr);
     }
+    // Para "articulo"/"es2fr" (donde la palabra en francés no se ha visto
+    // escrita en pantalla, solo tecleada) se ofrece oírla al revisar.
+    if((q.dir === "articulo" || q.dir === "es2fr") && ("speechSynthesis" in window)){
+      var listenBtn = document.createElement("button");
+      listenBtn.type = "button";
+      listenBtn.className = "speaker-btn small";
+      listenBtn.setAttribute("aria-label","Escuchar");
+      listenBtn.textContent = "🔊";
+      listenBtn.addEventListener("click", function(){ speakFrench(q.item.fr); });
+      fb.appendChild(document.createElement("br"));
+      fb.appendChild(listenBtn);
+    }
     els.streakVal.textContent = state.streak;
     els.starsVal.textContent = state.stars;
+    renderFrancesMasteryStrip();
 
     var delay = ok ? 900 : 2400; // un poco más de tiempo para leer bien la palabra escrita
     setTimeout(function(){
+      if(state.mode === "examen"){
+        advanceExam();
+        return;
+      }
       if(state.roundActive || state.mode !== "contrarreloj"){
         next();
       }
@@ -1785,17 +1917,31 @@
   }
 
   function addToFallosFrances(frWord){
-    if(fallosFrances.indexOf(frWord) === -1){
-      fallosFrances.push(frWord);
-      saveJSON(FALLOS_FR_KEY, fallosFrances);
+    var entry = fallosFrances.filter(function(f){ return f.fr === frWord; })[0];
+    if(entry){
+      entry.count = (entry.count || 1) + 1;
+      entry.lastWrong = Date.now();
+    }else{
+      fallosFrances.push({fr:frWord, count:1, lastWrong:Date.now()});
     }
+    saveJSON(FALLOS_FR_KEY, fallosFrances);
   }
   function removeFromFallosFrances(frWord){
-    var next = fallosFrances.filter(function(w){ return w !== frWord; });
+    var next = fallosFrances.filter(function(f){ return f.fr !== frWord; });
     if(next.length !== fallosFrances.length){
       fallosFrances = next;
       saveJSON(FALLOS_FR_KEY, fallosFrances);
     }
+  }
+  // Repaso ponderado: las palabras falladas más veces salen más a menudo
+  // (tope de 5 para que una muy fallada no acapare todo el repaso).
+  function pickWeightedFallo(){
+    var pool = [];
+    fallosFrances.forEach(function(f){
+      var weight = Math.min(f.count || 1, 5);
+      for(var i=0;i<weight;i++) pool.push(f.fr);
+    });
+    return pick(pool);
   }
   function nextFrancesRepaso(){
     if(fallosFrances.length === 0){
@@ -1807,7 +1953,7 @@
       document.getElementById("goPracticaFr").addEventListener("click", function(){ setMode("practica"); });
       return;
     }
-    var frWord = pick(fallosFrances);
+    var frWord = pickWeightedFallo();
     var item = null;
     for(var i=0;i<FRANCES_DATA.length;i++){ if(FRANCES_DATA[i].fr === frWord){ item = FRANCES_DATA[i]; break; } }
     if(!item){ removeFromFallosFrances(frWord); nextFrancesRepaso(); return; }
@@ -1839,6 +1985,63 @@
     updateHint();
   }
 
+  /* ---------------- Examen de francés ----------------
+     Ronda de longitud fija, sin pistas ni segundo intento, para practicar
+     en condiciones parecidas a como se lo van a preguntar de verdad. No
+     usa el motor de startRound()/endRound() (que es para rondas a tiempo)
+     sino un índice propio que avanza pregunta a pregunta. */
+  function examPoolSize(){
+    var pool = francesPool();
+    if(!pool.length) pool = FRANCES_DATA;
+    return Math.min(EXAM_LENGTH, pool.length);
+  }
+  function renderExamIntro(){
+    var n = examPoolSize();
+    els.gameCard.innerHTML = '<div class="summary">'
+      + '<span class="num">📝</span>'
+      + '<p>Examen de '+n+' preguntas sobre las categorías elegidas arriba. Sin pistas ni segundo intento, como en clase.</p>'
+      + '<button class="primary-btn" id="startExamBtn">Empezar examen</button>'
+      + '</div>';
+    document.getElementById("startExamBtn").addEventListener("click", startExam);
+  }
+  function startExam(){
+    var pool = francesPool();
+    if(!pool.length) pool = FRANCES_DATA;
+    var n = Math.min(EXAM_LENGTH, pool.length);
+    var shuffled = pool.slice().sort(function(){ return Math.random() - 0.5; });
+    state.examQuestions = [];
+    for(var i=0;i<n;i++){
+      state.examQuestions.push(buildFrancesQuestion(shuffled[i]));
+    }
+    state.examIndex = 0;
+    state.examScore = 0;
+    renderExamQuestion();
+  }
+  function renderExamQuestion(){
+    state.current = state.examQuestions[state.examIndex];
+    renderFrancesQuestion();
+  }
+  function advanceExam(){
+    state.examIndex++;
+    if(state.examIndex >= state.examQuestions.length){
+      endExam();
+    }else{
+      renderExamQuestion();
+    }
+  }
+  function endExam(){
+    var total = state.examQuestions.length;
+    var pct = total ? Math.round((state.examScore/total)*100) : 0;
+    var msg = pct >= 90 ? "¡Sobresaliente! 🏆" : pct >= 70 ? "¡Muy bien! 🎉" : pct >= 50 ? "Vas bien, sigue practicando" : "Repasa un poco más y lo vuelves a intentar";
+    els.gameCard.innerHTML = '<div class="summary">'
+      + '<span class="num">'+state.examScore+'/'+total+'</span>'
+      + '<p>'+msg+' ('+pct+'%)</p>'
+      + '<button class="primary-btn" id="retryExamBtn">Hacer otro examen</button>'
+      + '</div>';
+    document.getElementById("retryExamBtn").addEventListener("click", startExam);
+    updateHint();
+  }
+
   /* ---------------- Arranque (con soporte para republicaciones en caliente) ---------------- */
   function start(saved){
     var validSubject = false;
@@ -1847,6 +2050,11 @@
       if(typeof saved.streak === "number") state.streak = saved.streak;
       if(typeof saved.stars === "number") state.stars = saved.stars;
       if(typeof saved.mode === "string") state.mode = saved.mode;
+      if(Array.isArray(saved.francesCategories) && saved.francesCategories.length){
+        var validCats = FR_CATS.map(function(c){ return c.id; });
+        var filteredCats = saved.francesCategories.filter(function(c){ return validCats.indexOf(c) !== -1; });
+        if(filteredCats.length) state.francesCategories = filteredCats;
+      }
       validSubject = SUBJECTS.some(function(s){ return s.id === saved.subject; });
     }
     renderTablesPicker();
@@ -1865,7 +2073,7 @@
     try{
       if(window.claude && window.claude.hot && window.claude.hot.snapshot){
         window.claude.hot.snapshot(function(){
-          var restoreMode = (state.mode === "contrarreloj" || state.mode === "torneo") ? "practica" : state.mode;
+          var restoreMode = (state.mode === "contrarreloj" || state.mode === "torneo" || state.mode === "examen") ? "practica" : state.mode;
           var inSubject = !els.subjectView.hidden;
           return {
             selectedTables: state.selectedTables,
@@ -1873,7 +2081,8 @@
             stars: state.stars,
             mode: restoreMode,
             subject: state.subject,
-            view: inSubject ? "subject" : "menu"
+            view: inSubject ? "subject" : "menu",
+            francesCategories: state.francesCategories
           };
         });
       }
