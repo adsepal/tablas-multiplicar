@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#FF5D5D">
-<meta name="description" content="Practica las tablas de multiplicar y el vocabulario de francés: aciertos de memoria, contrarreloj, fallos para repasar y torneo con amigas.">
+<meta name="description" content="Practica las tablas de multiplicar, el vocabulario de francés y matemáticas (números grandes, aproximación, ordinales y romanos): aciertos de memoria, contrarreloj, fallos para repasar y torneo con amigas.">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icon-192.png">
 <link rel="apple-touch-icon" href="./icon-192.png">
@@ -317,6 +317,13 @@
     color:var(--text-soft);
     margin-top:14px;
   }
+  .mat-problema{
+    font-size:17px;
+    font-weight:700;
+    line-height:1.45;
+    text-align:left;
+    padding:0 4px;
+  }
   .frances-input{
     display:block;
     width:100%;
@@ -585,6 +592,7 @@
   .mastery-pill.m-high{background:var(--success-soft);color:var(--success);}
   .mastery-pill.picked{outline:2px solid var(--accent);outline-offset:1px;}
   .mastery-3{grid-template-columns:repeat(3,1fr);}
+  .mastery-5{grid-template-columns:repeat(5,1fr);font-size:10px;}
 
   .hint{
     text-align:center;
@@ -665,6 +673,9 @@
   var FALLOS_FR_KEY  = "tablas-fallos-frances-v1";
   var BEST_FR_KEY    = "tablas-mejor-contrarreloj-frances-v1";
   var PROGRESO_FR_KEY = "tablas-progreso-frances-v1";
+  var FALLOS_MATES_KEY  = "tablas-fallos-mates-v1";
+  var BEST_MATES_KEY    = "tablas-mejor-contrarreloj-mates-v1";
+  var PROGRESO_MATES_KEY = "tablas-progreso-mates-v1";
 
   function loadJSON(key, fallback){
     try{
@@ -689,6 +700,12 @@
   });
   var mejorContrarrelojFrances = loadJSON(BEST_FR_KEY, 0);
   var progresoFrances = loadJSON(PROGRESO_FR_KEY, {}); // { "le poisson": {correct:3,total:5}, ... }
+  // Fallos de matemáticas: aquí no hay una "palabra" fija que buscar, así
+  // que guardamos una foto completa de la pregunta fallada (prompt, la
+  // respuesta correcta ya formateada...) para poder repetirla tal cual.
+  var fallosMates = loadJSON(FALLOS_MATES_KEY, []); // [{cat,dir,prompt,answer,correctDisplay,count,lastWrong}, ...]
+  var mejorContrarrelojMates = loadJSON(BEST_MATES_KEY, 0);
+  var progresoMates = loadJSON(PROGRESO_MATES_KEY, {}); // { "numeros": {correct:4,total:9}, ... } por categoría
 
   function regTable(t){
     if(!progreso[t]) progreso[t] = {correct:0, total:0};
@@ -697,6 +714,10 @@
   function regFrances(word){
     if(!progresoFrances[word]) progresoFrances[word] = {correct:0, total:0};
     return progresoFrances[word];
+  }
+  function regMates(cat){
+    if(!progresoMates[cat]) progresoMates[cat] = {correct:0, total:0};
+    return progresoMates[cat];
   }
 
   /* =========================================================
@@ -786,6 +807,208 @@
   function formaVerbo(v, p){ return (p === "il" || p === "elle") ? v.il : v[p]; }
 
   /* =========================================================
+     Matemáticas: números de 4 y 5 cifras, aproximaciones,
+     ordinales, números romanos y problemas. Todo se genera al
+     vuelo (no hay un banco fijo de palabras como en francés), así
+     que cada pregunta lleva ya su respuesta correcta calculada.
+     ========================================================= */
+  var MATES_CATS = [
+    {id:"numeros", label:"Números grandes"},
+    {id:"aproximacion", label:"Aproximaciones"},
+    {id:"ordinales", label:"Ordinales"},
+    {id:"romanos", label:"Romanos"},
+    {id:"problemas", label:"Problemas"}
+  ];
+
+  function randInt(min, max){ return min + Math.floor(Math.random()*(max-min+1)); }
+
+  // Separador de miles "a la española" (15.368), solo para mostrar: para
+  // comparar respuestas siempre se quitan estos puntos (ver matchesMatesAnswer).
+  function formatMiles(n){
+    var neg = n < 0;
+    var s = String(Math.abs(Math.trunc(n)));
+    var out = "";
+    for(var i=0;i<s.length;i++){
+      if(i>0 && (s.length-i)%3===0) out += ".";
+      out += s[i];
+    }
+    return (neg?"-":"")+out;
+  }
+  function capitalize(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+  /* ---- Número en letras (0-999.999), para "cómo se lee" ---- */
+  var NUM_UNIDADES = ["cero","uno","dos","tres","cuatro","cinco","seis","siete","ocho","nueve"];
+  var NUM_DIECIS   = ["diez","once","doce","trece","catorce","quince","dieciséis","diecisiete","dieciocho","diecinueve"];
+  var NUM_VEINTIS  = ["veinte","veintiuno","veintidós","veintitrés","veinticuatro","veinticinco","veintiséis","veintisiete","veintiocho","veintinueve"];
+  var NUM_DECENAS  = {3:"treinta",4:"cuarenta",5:"cincuenta",6:"sesenta",7:"setenta",8:"ochenta",9:"noventa"};
+  var NUM_CENTENAS = {2:"doscientos",3:"trescientos",4:"cuatrocientos",5:"quinientos",6:"seiscientos",7:"setecientos",8:"ochocientos",9:"novecientos"};
+  function num2to99(n){
+    if(n<10) return NUM_UNIDADES[n];
+    if(n<20) return NUM_DIECIS[n-10];
+    if(n<30) return NUM_VEINTIS[n-20];
+    var t = Math.floor(n/10), u = n%10;
+    return u===0 ? NUM_DECENAS[t] : NUM_DECENAS[t]+" y "+NUM_UNIDADES[u];
+  }
+  function num2to999(n){
+    if(n===0) return "";
+    if(n<100) return num2to99(n);
+    var h = Math.floor(n/100), resto = n%100;
+    var hw = (h===1) ? (resto===0 ? "cien" : "ciento") : NUM_CENTENAS[h];
+    return resto===0 ? hw : hw+" "+num2to99(resto);
+  }
+  // "uno"/"veintiuno" pierden la "o" final pegados a un nombre ("un mil",
+  // "veintiún mil"), igual que "un coche" o "veintiún euros".
+  function apocopeMil(s){
+    if(/veintiuno$/.test(s)) return s.replace(/veintiuno$/, "veintiún");
+    if(/(^|\s)uno$/.test(s)) return s.replace(/uno$/, "un");
+    return s;
+  }
+  function numeroEnLetras(n){
+    if(n===0) return "cero";
+    if(n<1000) return num2to999(n);
+    var miles = Math.floor(n/1000), resto = n%1000;
+    var milesWord = (miles===1) ? "mil" : apocopeMil(num2to999(miles))+" mil";
+    return resto===0 ? milesWord : milesWord+" "+num2to999(resto);
+  }
+
+  /* ---- Ordinales en letras (1.º-99.º), tal y como los da el libro ---- */
+  var ORD_UNIDADES = ["","primero","segundo","tercero","cuarto","quinto","sexto","séptimo","octavo","noveno"];
+  var ORD_DIECIS = {10:"décimo",11:"undécimo",12:"duodécimo",13:"decimotercero",14:"decimocuarto",15:"decimoquinto",16:"decimosexto",17:"decimoséptimo",18:"decimoctavo",19:"decimonoveno"};
+  var ORD_DECENAS = {2:"vigésimo",3:"trigésimo",4:"cuadragésimo",5:"quincuagésimo",6:"sexagésimo",7:"septuagésimo",8:"octogésimo",9:"nonagésimo"};
+  function ordinalToWords(n){
+    if(n>=10 && n<=19) return ORD_DIECIS[n];
+    if(n>=1 && n<=9) return ORD_UNIDADES[n];
+    var t = Math.floor(n/10), u = n%10;
+    return u===0 ? ORD_DECENAS[t] : ORD_DECENAS[t]+" "+ORD_UNIDADES[u];
+  }
+
+  /* ---- Números romanos (1-3999), las cuatro reglas del libro ---- */
+  var ROMAN_VALUES = [[1000,"M"],[900,"CM"],[500,"D"],[400,"CD"],[100,"C"],[90,"XC"],[50,"L"],[40,"XL"],[10,"X"],[9,"IX"],[5,"V"],[4,"IV"],[1,"I"]];
+  function arabicToRoman(n){
+    var out = "";
+    for(var i=0;i<ROMAN_VALUES.length;i++){
+      while(n >= ROMAN_VALUES[i][0]){ out += ROMAN_VALUES[i][1]; n -= ROMAN_VALUES[i][0]; }
+    }
+    return out;
+  }
+
+  /* ---- Preguntas: números de 4-5 cifras (leer/componer/descomponer/comparar) ---- */
+  function buildNumerosQuestion(){
+    var dir = pick(["leer","componer","descomponer","comparar"]);
+    if(dir === "comparar"){
+      var n1 = randInt(1000,99999), n2 = randInt(1000,99999);
+      while(n2 === n1) n2 = randInt(1000,99999);
+      var simbolo = (n1 < n2) ? "<" : ">";
+      return { cat:"numeros", dir:"comparar", prompt: formatMiles(n1)+"   ___   "+formatMiles(n2), correct: simbolo, checkType:"simbolo", correctDisplay: simbolo };
+    }
+    var n = randInt(1000,99999);
+    var s5 = ("00000"+n).slice(-5);
+    if(dir === "leer"){
+      var letras = numeroEnLetras(n);
+      return { cat:"numeros", dir:"leer", prompt: formatMiles(n), correct: letras, checkType:"texto", correctDisplay: capitalize(letras) };
+    }
+    if(dir === "componer"){
+      var labels = ["DM","UM","C","D","U"];
+      var terms = [];
+      for(var i=0;i<5;i++){
+        var d = parseInt(s5[i],10);
+        if(d > 0) terms.push(d+" "+labels[i]);
+      }
+      if(!terms.length) terms.push("0 U");
+      return { cat:"numeros", dir:"componer", prompt: terms.join(" + "), correct: n, checkType:"numero", correctDisplay: formatMiles(n) };
+    }
+    // descomponer: cuántas unidades de un orden concreto tiene el número
+    var placeIdx = randInt(0,4);
+    var placeLabels = ["DM","UM","C","D","U"];
+    var placeNames = {"DM":"decenas de millar","UM":"unidades de millar","C":"centenas","D":"decenas","U":"unidades"};
+    var digit = parseInt(s5[placeIdx],10);
+    return { cat:"numeros", dir:"descomponer", prompt: "¿Cuántas "+placeNames[placeLabels[placeIdx]]+" tiene "+formatMiles(n)+"?", correct: digit, checkType:"numero", correctDisplay: String(digit) };
+  }
+
+  /* ---- Preguntas: aproximaciones (redondeo) ---- */
+  function buildAproximacionQuestion(){
+    var n = randInt(1000,99999);
+    var orden = pick(["decenas","centenas","millares"]);
+    var divisor = orden==="decenas" ? 10 : (orden==="centenas" ? 100 : 1000);
+    var redondeado = Math.round(n/divisor)*divisor;
+    return { cat:"aproximacion", dir:"aproximar", prompt: "Aproxima "+formatMiles(n)+" a las "+orden+".", correct: redondeado, checkType:"numero", correctDisplay: formatMiles(redondeado) };
+  }
+
+  /* ---- Preguntas: ordinales (11.º-99.º, cifras<->letras) ---- */
+  function buildOrdinalQuestion(){
+    var n = randInt(11,99);
+    var letras = ordinalToWords(n);
+    if(Math.random() < 0.5){
+      return { cat:"ordinales", dir:"cifras_a_letras", prompt: n+".º", correct: letras, checkType:"texto", correctDisplay: capitalize(letras) };
+    }
+    return { cat:"ordinales", dir:"letras_a_cifras", prompt: capitalize(letras)+".", correct: n, checkType:"numero", correctDisplay: n+".º" };
+  }
+
+  /* ---- Preguntas: números romanos (arábigo<->romano) ---- */
+  function buildRomanoQuestion(){
+    var r = Math.random();
+    var n = r < 0.7 ? randInt(1,99) : (r < 0.9 ? randInt(100,999) : randInt(1000,3999));
+    var roman = arabicToRoman(n);
+    if(Math.random() < 0.5){
+      return { cat:"romanos", dir:"arabigo_a_romano", prompt: String(n), correct: roman, checkType:"romano", correctDisplay: roman };
+    }
+    return { cat:"romanos", dir:"romano_a_arabigo", prompt: roman, correct: n, checkType:"numero", correctDisplay: String(n) };
+  }
+
+  /* ---- Preguntas: problemas con números grandes (originales, parametrizados) ----
+     No son los enunciados del libro (no se copian), sino problemas propios
+     inspirados en los mismos temas (tiendas, hoteles, carreras, precios,
+     población...), con números que cambian cada vez. */
+  var PROBLEMA_TEMPLATES = [
+    function probTienda(){
+      var lunes = randInt(1800,3200), menosMartes = randInt(40,150), masMiercoles = randInt(30,120);
+      var martes = lunes - menosMartes, miercoles = martes + masMiercoles;
+      return { prompt:"Una librería abre toda la semana. El lunes entraron "+formatMiles(lunes)+" clientes. El martes entraron "+menosMartes+" menos que el lunes, y el miércoles "+masMiercoles+" más que el martes. ¿Cuántos clientes entraron entre los tres días?", correct: lunes+martes+miercoles };
+    },
+    function probHotel(){
+      var dobles = randInt(30,60), individuales = randInt(10,30);
+      var doblesLibres = randInt(5, Math.max(6,Math.floor(dobles/3))), indivLibres = randInt(2, Math.max(3,Math.floor(individuales/3)));
+      return { prompt:"Un hotel tiene "+dobles+" habitaciones dobles y "+individuales+" individuales. Esta noche han quedado libres "+doblesLibres+" dobles y "+indivLibres+" individuales. ¿Cuántas habitaciones están ocupadas?", correct: (dobles-doblesLibres)+(individuales-indivLibres) };
+    },
+    function probMaraton(){
+      var estudiantes = randInt(60,140), docentes = randInt(8,25), padres = randInt(20,70);
+      return { prompt:"En una carrera popular se han inscrito "+estudiantes+" estudiantes, "+docentes+" profesores y "+padres+" madres y padres. ¿Cuántos participantes adultos hay en total (sin contar los estudiantes)?", correct: docentes+padres };
+    },
+    function probCarrera(){
+      var puestoA = randInt(5,40), detras = randInt(3,25);
+      return { prompt:"En una carrera ciclista, Laura va en el puesto "+puestoA+". Marcos termina esa etapa "+detras+" puestos por detrás de ella. ¿En qué puesto termina Marcos?", correct: puestoA+detras };
+    },
+    function probPrecios(){
+      var p1 = randInt(300,1800), p2 = randInt(300,1800), p3 = randInt(300,1800);
+      function roundHundred(x){ return Math.round(x/100)*100; }
+      return { prompt:"Tres electrodomésticos cuestan "+p1+" €, "+p2+" € y "+p3+" €. Aproxima cada precio a las centenas y suma esas tres aproximaciones. ¿Cuánto da la suma?", correct: roundHundred(p1)+roundHundred(p2)+roundHundred(p3) };
+    },
+    function probPoblacion(){
+      var antes = randInt(30000,70000), variacion = randInt(500,4000);
+      var ahora = Math.random()<0.5 ? antes+variacion : antes-variacion;
+      return { prompt:"Un pueblo tenía "+formatMiles(antes)+" habitantes hace diez años y ahora tiene "+formatMiles(ahora)+". ¿Cuál es la diferencia entre los dos años?", correct: Math.abs(ahora-antes) };
+    },
+    function probFruteria(){
+      var total = randInt(120,260), ninos = randInt(40,Math.floor(total*0.6));
+      return { prompt:"En una frutería han entrado "+total+" clientes esta semana. "+ninos+" eran menores de edad y el resto, personas adultas. ¿Cuántas personas adultas entraron?", correct: total-ninos };
+    }
+  ];
+  function buildProblemaQuestion(){
+    var r = pick(PROBLEMA_TEMPLATES)();
+    return { cat:"problemas", dir:"problema", prompt: r.prompt, correct: r.correct, checkType:"numero", correctDisplay: formatMiles(r.correct) };
+  }
+
+  function generateMatesPregunta(){
+    var cats = state.matesCategories.length ? state.matesCategories : MATES_CATS.map(function(c){ return c.id; });
+    var cat = pick(cats);
+    if(cat === "numeros") return buildNumerosQuestion();
+    if(cat === "aproximacion") return buildAproximacionQuestion();
+    if(cat === "ordinales") return buildOrdinalQuestion();
+    if(cat === "romanos") return buildRomanoQuestion();
+    return buildProblemaQuestion();
+  }
+
+  /* =========================================================
      Asignaturas disponibles desde el menú principal. Para añadir
      una nueva (restas, fracciones, lo que toque en el cole) basta
      con añadir una entrada aquí y registrar sus funciones en
@@ -793,7 +1016,8 @@
      ========================================================= */
   var SUBJECTS = [
     {id:"tablas", icon:"🔢", title:"Tablas de multiplicar", sub:"Practica las multiplicaciones de memoria"},
-    {id:"frances", icon:"🇫🇷", title:"Francés — Vocabulario", sub:"Significado, escritura con artículo y dictado"}
+    {id:"frances", icon:"🇫🇷", title:"Francés — Vocabulario", sub:"Significado, escritura con artículo y dictado"},
+    {id:"mates", icon:"🧮", title:"Matemáticas — Números grandes", sub:"Lectura, aproximación, ordinales, romanos y problemas"}
   ];
 
   /* =========================================================
@@ -802,8 +1026,9 @@
      jugando (ver window.claude.hot al final del archivo).
      ========================================================= */
   var state = {
-    subject: null,             // tablas | frances | null (en el menú)
+    subject: null,             // tablas | frances | mates | null (en el menú)
     francesCategories: ["comida","mesa","dia"], // categorías activas (varias a la vez)
+    matesCategories: ["numeros","aproximacion","ordinales","romanos","problemas"],
     mode: "practica",         // practica | aprender | dictado | contrarreloj | repaso | torneo | examen
     selectedTables: [1,2,3,4,5,6,7,8,9,10],
     streak: 0,
@@ -913,6 +1138,19 @@
   els.masteryStrip.addEventListener("click", function(e){
     var btn = e.target.closest(".mastery-pill");
     if(!btn) return;
+    if(state.subject === "mates"){
+      var mcat = btn.getAttribute("data-matcat");
+      if(!mcat) return;
+      if(state.matesCategories.length === 1 && state.matesCategories[0] === mcat){
+        state.matesCategories = MATES_CATS.map(function(c){ return c.id; });
+      }else{
+        state.matesCategories = [mcat];
+      }
+      syncMatesCategoryPickerUI();
+      renderMatesMasteryStrip();
+      if(state.mode === "practica") next();
+      return;
+    }
     if(state.subject === "frances"){
       var cat = btn.getAttribute("data-cat");
       if(!cat) return;
@@ -979,6 +1217,20 @@
   els.categoryPicker.addEventListener("click", function(e){
     var btn = e.target.closest(".chip");
     if(!btn) return;
+    if(state.subject === "mates"){
+      var mcat = btn.getAttribute("data-matcat");
+      if(mcat === "todas"){
+        state.matesCategories = MATES_CATS.map(function(c){ return c.id; });
+      }else{
+        var midx = state.matesCategories.indexOf(mcat);
+        if(midx === -1) state.matesCategories.push(mcat);
+        else if(state.matesCategories.length > 1) state.matesCategories.splice(midx,1);
+      }
+      syncMatesCategoryPickerUI();
+      renderMatesMasteryStrip();
+      if(!state.roundActive && state.mode === "practica"){ next(); }
+      return;
+    }
     var cat = btn.getAttribute("data-cat");
     if(cat === "todas"){
       state.francesCategories = FR_CATS.map(function(c){ return c.id; });
@@ -995,6 +1247,35 @@
       startAprender();
     }
   });
+
+  /* ---------------- Categorías de Matemáticas ----------------
+     Mismo patrón de selección múltiple que las categorías de francés,
+     pero comparten el elemento #categoryPicker (se rellena con uno u
+     otro contenido según la asignatura activa). */
+  function renderMatesCategoryPicker(){
+    var html = '<button class="chip" data-matcat="todas">Todas</button>'
+      + MATES_CATS.map(function(c){ return '<button class="chip" data-matcat="'+c.id+'">'+escapeHTML(c.label)+'</button>'; }).join('');
+    els.categoryPicker.innerHTML = html;
+    syncMatesCategoryPickerUI();
+  }
+  function syncMatesCategoryPickerUI(){
+    var allOn = MATES_CATS.every(function(c){ return state.matesCategories.indexOf(c.id) !== -1; });
+    Array.prototype.forEach.call(els.categoryPicker.querySelectorAll(".chip"), function(chip){
+      var cat = chip.getAttribute("data-matcat");
+      chip.classList.toggle("active", cat === "todas" ? allOn : state.matesCategories.indexOf(cat) !== -1);
+    });
+  }
+  function renderMatesMasteryStrip(){
+    var html = MATES_CATS.map(function(c){
+      var d = progresoMates[c.id] || {correct:0,total:0};
+      var pct = d.total ? Math.round((d.correct/d.total)*100) : 0;
+      var cls = "m-low";
+      if(pct >= 80) cls = "m-high"; else if(pct >= 40) cls = "m-mid";
+      var picked = (state.matesCategories.length===1 && state.matesCategories[0]===c.id) ? " picked" : "";
+      return '<button class="mastery-pill '+cls+picked+'" data-matcat="'+c.id+'" title="'+escapeHTML(c.label)+': '+pct+'%">'+escapeHTML(c.label)+'<br>'+pct+'%</button>';
+    }).join('');
+    els.masteryStrip.innerHTML = html;
+  }
 
   /* ---------------- Materia: Tablas / Francés ---------------- */
   function renderSubjectMenu(){
@@ -1028,12 +1309,18 @@
   }
   function renderSubjectUI(){
     var isFrances = state.subject === "frances";
-    els.tablesPicker.hidden = isFrances;
-    els.categoryPicker.hidden = !isFrances;
-    els.masteryStrip.classList.toggle("mastery-3", isFrances);
+    var isMates = state.subject === "mates";
+    els.tablesPicker.hidden = isFrances || isMates;
+    els.categoryPicker.hidden = !(isFrances || isMates);
+    els.masteryStrip.classList.remove("mastery-3","mastery-5");
     if(isFrances){
+      els.masteryStrip.classList.add("mastery-3");
       renderCategoryPicker();
       renderFrancesMasteryStrip();
+    }else if(isMates){
+      els.masteryStrip.classList.add("mastery-5");
+      renderMatesCategoryPicker();
+      renderMatesMasteryStrip();
     }else{
       renderMasteryStrip();
     }
@@ -1041,12 +1328,26 @@
   }
   function renderModesNav(){
     var isFrances = state.subject === "frances";
-    var html = (isFrances ? '<button class="mode-btn" data-mode="aprender" role="tab">Aprender</button>' : '')
-      + '<button class="mode-btn" data-mode="practica" role="tab">Práctica</button>'
-      + (isFrances ? '<button class="mode-btn" data-mode="dictado" role="tab">Dictado</button>' : '')
-      + '<button class="mode-btn" data-mode="contrarreloj" role="tab">Contrarreloj</button>'
-      + '<button class="mode-btn" data-mode="repaso" role="tab">Fallos</button>'
-      + (isFrances ? '<button class="mode-btn" data-mode="examen" role="tab">Examen</button>' : '<button class="mode-btn" data-mode="torneo" role="tab">Torneo</button>');
+    var isMates = state.subject === "mates";
+    var html;
+    if(isFrances){
+      html = '<button class="mode-btn" data-mode="aprender" role="tab">Aprender</button>'
+        + '<button class="mode-btn" data-mode="practica" role="tab">Práctica</button>'
+        + '<button class="mode-btn" data-mode="dictado" role="tab">Dictado</button>'
+        + '<button class="mode-btn" data-mode="contrarreloj" role="tab">Contrarreloj</button>'
+        + '<button class="mode-btn" data-mode="repaso" role="tab">Fallos</button>'
+        + '<button class="mode-btn" data-mode="examen" role="tab">Examen</button>';
+    }else if(isMates){
+      html = '<button class="mode-btn" data-mode="practica" role="tab">Práctica</button>'
+        + '<button class="mode-btn" data-mode="contrarreloj" role="tab">Contrarreloj</button>'
+        + '<button class="mode-btn" data-mode="repaso" role="tab">Fallos</button>'
+        + '<button class="mode-btn" data-mode="examen" role="tab">Examen</button>';
+    }else{
+      html = '<button class="mode-btn" data-mode="practica" role="tab">Práctica</button>'
+        + '<button class="mode-btn" data-mode="contrarreloj" role="tab">Contrarreloj</button>'
+        + '<button class="mode-btn" data-mode="repaso" role="tab">Fallos</button>'
+        + '<button class="mode-btn" data-mode="torneo" role="tab">Torneo</button>';
+    }
     els.modes.innerHTML = html;
     els.modes.classList.toggle("modes-3", isFrances);
     syncModeButtonsUI();
@@ -1073,12 +1374,14 @@
     syncModeButtonsUI();
     if(mode === "contrarreloj"){
       if(state.subject === "frances") renderFrancesContrarrelojIntro();
+      else if(state.subject === "mates") renderMatesContrarrelojIntro();
       else renderContrarrelojIntro();
     }else if(mode === "torneo"){
       state.torneoSubmode = null;
       renderTorneoIntro();
     }else if(mode === "examen"){
-      renderExamIntro();
+      if(state.subject === "mates") renderMatesExamIntro();
+      else renderExamIntro();
     }else if(mode === "aprender"){
       startAprender();
     }else{
@@ -1098,6 +1401,13 @@
       else if(state.mode === "contrarreloj") els.hint.textContent = "60 segundos de vocabulario" + (incluyeGramaticaHint ? " y gramática" : "") + ". ¡A por tu récord: " + mejorContrarrelojFrances + "!";
       else if(state.mode === "examen") els.hint.textContent = "Examen de " + examPoolSize() + " preguntas sin pistas, para practicar como si fuera de verdad.";
       else els.hint.textContent = "Aquí aparecen las palabras de francés que fallaste, para repasarlas (las que más fallas salen más).";
+      return;
+    }
+    if(state.subject === "mates"){
+      if(state.mode === "practica") els.hint.textContent = "Practica números grandes, aproximaciones, ordinales, romanos o problemas, según lo que tengas activo arriba.";
+      else if(state.mode === "contrarreloj") els.hint.textContent = "60 segundos de matemáticas. ¡A por tu récord: " + mejorContrarrelojMates + "!";
+      else if(state.mode === "examen") els.hint.textContent = "Examen de " + EXAM_LENGTH + " preguntas sin pistas, para practicar como si fuera de verdad.";
+      else els.hint.textContent = "Aquí aparecen las preguntas que fallaste, para repasarlas (las que más fallas salen más).";
       return;
     }
     if(state.mode === "practica") els.hint.textContent = "Escribe el resultado de memoria y pulsa ✓. Puedes elegir una sola tabla arriba.";
@@ -1124,6 +1434,15 @@
       }
       state.current = generateFrancesPregunta();
       renderFrancesQuestion();
+      return;
+    }
+    if(state.subject === "mates"){
+      if(state.mode === "repaso"){
+        nextMatesRepaso();
+        return;
+      }
+      state.current = generateMatesPregunta();
+      renderMatesQuestion();
       return;
     }
     if(state.mode === "repaso"){
@@ -1353,6 +1672,10 @@
     state.roundActive = false;
     if(state.subject === "frances"){
       endFrancesContrarrelojRound();
+      return;
+    }
+    if(state.subject === "mates"){
+      endMatesContrarrelojRound();
       return;
     }
     if(state.mode === "torneo"){
@@ -2158,6 +2481,249 @@
     updateHint();
   }
 
+  /* ---------------- Matemáticas: números grandes, aproximación, ordinales, romanos y problemas ----------------
+     Mismo patrón que francés (pregunta con input de texto libre), pero
+     aquí no hay un banco fijo de "palabras": cada pregunta se genera al
+     vuelo y ya trae calculada su respuesta correcta (ver generateMatesPregunta
+     más arriba), así que los Fallos guardan una foto completa de la
+     pregunta fallada en vez de buscarla por nombre. */
+  function matQuestionLabel(q){
+    if(q.dir === "leer" || q.dir === "cifras_a_letras") return "Escribe cómo se lee";
+    if(q.dir === "componer") return "¿Qué número es?";
+    if(q.dir === "descomponer") return "Responde con cifras";
+    if(q.dir === "comparar") return "Escribe <, > o =";
+    if(q.dir === "aproximar") return "Escribe el número aproximado";
+    if(q.dir === "letras_a_cifras") return "Escribe el número con cifras";
+    if(q.dir === "arabigo_a_romano") return "Escribe el número romano";
+    if(q.dir === "romano_a_arabigo") return "Escribe el número en cifras";
+    if(q.dir === "problema") return "Resuelve el problema";
+    return "Escribe la respuesta";
+  }
+  function matPlaceholder(q){
+    if(q.dir === "comparar") return "< , > o =";
+    if(q.dir === "arabigo_a_romano") return "Ej: XIV";
+    if(q.dir === "leer" || q.dir === "cifras_a_letras") return "Escribe en letras";
+    return "Escribe la respuesta";
+  }
+  function renderMatesQuestion(){
+    var q = state.current;
+    state.answered = false;
+    var timed = (state.mode === "contrarreloj");
+    var html = '';
+    if(timed) html += '<div class="timerbar" id="timerBar"><i id="timerFill"></i></div>';
+    var subLabel = (state.mode === "repaso") ? "Repasando un fallo"
+      : (state.mode === "examen") ? ("Pregunta "+(state.examIndex+1)+"/"+state.examQuestions.length+" · "+matQuestionLabel(q))
+      : matQuestionLabel(q);
+    var promptClass = (q.dir === "problema") ? "mat-problema" : "fr-prompt";
+    html += '<div class="question-wrap">'
+      + '<p class="question-sub">'+subLabel+'</p>'
+      + '<div class="'+promptClass+'">'+escapeHTML(q.prompt)+'</div>'
+      + '</div>'
+      + '<input class="frances-input" id="matesInput" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="'+matPlaceholder(q)+'">'
+      + '<button class="primary-btn" id="checkMatesBtn">Comprobar ✓</button>'
+      + '<p class="feedback" id="feedback"></p>';
+    els.gameCard.innerHTML = html;
+    if(timed){
+      els.timerBar = document.getElementById("timerBar");
+      els.timerFill = document.getElementById("timerFill");
+    }
+    var input = document.getElementById("matesInput");
+    input.focus();
+    input.addEventListener("keydown", function(e){
+      if(e.key === "Enter"){ e.preventDefault(); checkMatesAnswer(); }
+    });
+    document.getElementById("checkMatesBtn").addEventListener("click", checkMatesAnswer);
+  }
+
+  function matchesMatesAnswer(raw, q){
+    if(q.checkType === "numero"){
+      var digits = raw.replace(/[^0-9-]/g,"");
+      var val = parseInt(digits,10);
+      return !isNaN(val) && val === q.correct;
+    }
+    if(q.checkType === "texto"){
+      return normalizeEs(raw) === normalizeEs(q.correct);
+    }
+    if(q.checkType === "simbolo"){
+      return raw.trim().charAt(0) === q.correct;
+    }
+    if(q.checkType === "romano"){
+      return raw.toUpperCase().replace(/[^IVXLCDM]/g,"") === q.correct;
+    }
+    return false;
+  }
+
+  function checkMatesAnswer(){
+    if(state.answered) return;
+    var input = document.getElementById("matesInput");
+    if(!input) return;
+    var raw = input.value;
+    if(raw.trim() === "") { input.focus(); return; }
+    state.answered = true;
+    var q = state.current;
+    var ok = matchesMatesAnswer(raw, q);
+
+    input.disabled = true;
+    input.classList.add(ok ? "correct" : "wrong");
+    document.getElementById("checkMatesBtn").disabled = true;
+    showResultMark(ok);
+
+    var stats = regMates(q.cat);
+    stats.total++;
+    if(ok) stats.correct++;
+    saveJSON(PROGRESO_MATES_KEY, progresoMates);
+    if(state.mode === "examen" && ok) state.examScore++;
+
+    var fb = document.getElementById("feedback");
+    if(ok){
+      state.streak++;
+      if(state.streak > 0 && state.streak % 5 === 0) state.stars++;
+      if(state.roundActive) state.roundScore++;
+      fb.textContent = pick(["¡Genial!","¡Eso es!","¡Muy bien!","¡Perfecto!","¡Sigue así!"]);
+      fb.className = "feedback good";
+      removeFromFallosMates(q);
+    }else{
+      state.streak = 0;
+      fb.textContent = "Era: " + q.correctDisplay + ". ¡A por la siguiente!";
+      fb.className = "feedback bad";
+      addToFallosMates(q);
+    }
+    els.streakVal.textContent = state.streak;
+    els.starsVal.textContent = state.stars;
+    renderMatesMasteryStrip();
+
+    var advance = (state.mode === "examen") ? advanceMatesExam : next;
+    if(state.roundActive){
+      setTimeout(function(){ advance(); }, ok ? 900 : 2400);
+    }else if(ok){
+      setTimeout(function(){ advance(); }, 900);
+    }else{
+      appendNextButton(advance);
+    }
+  }
+
+  function matesFalloKey(q){ return q.cat+"|"+q.dir+"|"+q.prompt; }
+  function addToFallosMates(q){
+    var key = matesFalloKey(q);
+    var entry = fallosMates.filter(function(f){ return matesFalloKey(f) === key; })[0];
+    if(entry){
+      entry.count = (entry.count || 1) + 1;
+      entry.lastWrong = Date.now();
+    }else{
+      fallosMates.push({cat:q.cat, dir:q.dir, prompt:q.prompt, correct:q.correct, correctDisplay:q.correctDisplay, checkType:q.checkType, count:1, lastWrong:Date.now()});
+    }
+    saveJSON(FALLOS_MATES_KEY, fallosMates);
+  }
+  function removeFromFallosMates(q){
+    var key = matesFalloKey(q);
+    var next = fallosMates.filter(function(f){ return matesFalloKey(f) !== key; });
+    if(next.length !== fallosMates.length){
+      fallosMates = next;
+      saveJSON(FALLOS_MATES_KEY, fallosMates);
+    }
+  }
+  function pickWeightedFalloMates(){
+    var pool = [];
+    fallosMates.forEach(function(f){
+      var weight = Math.min(f.count || 1, 5);
+      for(var i=0;i<weight;i++) pool.push(f);
+    });
+    return pick(pool);
+  }
+  function nextMatesRepaso(){
+    if(fallosMates.length === 0){
+      els.gameCard.innerHTML = '<div class="empty-state">'
+        + '<span class="num">🎉</span>'
+        + '<p>¡No hay fallos pendientes! Sigue practicando y lo que falles aparecerá aquí para repasarlo.</p>'
+        + '<button class="primary-btn" id="goPracticaMates">Ir a práctica</button>'
+        + '</div>';
+      document.getElementById("goPracticaMates").addEventListener("click", function(){ setMode("practica"); });
+      return;
+    }
+    var f = pickWeightedFalloMates();
+    state.current = { cat:f.cat, dir:f.dir, prompt:f.prompt, correct:f.correct, correctDisplay:f.correctDisplay, checkType:f.checkType };
+    renderMatesQuestion();
+  }
+
+  function renderMatesContrarrelojIntro(){
+    els.gameCard.innerHTML = '<div class="summary">'
+      + '<span class="num">⏱️</span>'
+      + '<p>60 segundos de matemáticas.<br>Tu récord: <b>'+mejorContrarrelojMates+'</b></p>'
+      + '<button class="primary-btn" id="startRoundBtn">Empezar</button>'
+      + '</div>';
+    document.getElementById("startRoundBtn").addEventListener("click", function(){ startRound(60); });
+  }
+  function endMatesContrarrelojRound(){
+    if(state.roundScore > mejorContrarrelojMates){
+      mejorContrarrelojMates = state.roundScore;
+      saveJSON(BEST_MATES_KEY, mejorContrarrelojMates);
+    }
+    var esRecord = state.roundScore === mejorContrarrelojMates && state.roundScore > 0;
+    els.gameCard.innerHTML = '<div class="summary">'
+      + '<span class="num">'+state.roundScore+'</span>'
+      + '<p>'+(esRecord ? "¡Nuevo récord! 🏆" : "Aciertos en 60 segundos")+'</p>'
+      + '<p>Tu mejor marca: '+mejorContrarrelojMates+'</p>'
+      + '<button class="primary-btn" id="retryRoundBtn">Otra vez</button>'
+      + '</div>';
+    document.getElementById("retryRoundBtn").addEventListener("click", function(){ startRound(60); });
+    updateHint();
+  }
+
+  /* ---------------- Examen de matemáticas ----------------
+     Longitud fija (EXAM_LENGTH) repartida a partes iguales entre las
+     categorías activas, sin depender de un banco limitado de palabras
+     porque todo se genera al vuelo. */
+  function renderMatesExamIntro(){
+    els.gameCard.innerHTML = '<div class="summary">'
+      + '<span class="num">📝</span>'
+      + '<p>Examen de '+EXAM_LENGTH+' preguntas repartidas entre las categorías elegidas arriba. Sin pistas ni segundo intento, como en clase.</p>'
+      + '<button class="primary-btn" id="startExamBtn">Empezar examen</button>'
+      + '</div>';
+    document.getElementById("startExamBtn").addEventListener("click", startMatesExam);
+  }
+  function buildMatesQuestionFor(cat){
+    if(cat === "numeros") return buildNumerosQuestion();
+    if(cat === "aproximacion") return buildAproximacionQuestion();
+    if(cat === "ordinales") return buildOrdinalQuestion();
+    if(cat === "romanos") return buildRomanoQuestion();
+    return buildProblemaQuestion();
+  }
+  function startMatesExam(){
+    var cats = state.matesCategories.length ? state.matesCategories : MATES_CATS.map(function(c){ return c.id; });
+    var qs = [];
+    for(var i=0;i<EXAM_LENGTH;i++){
+      qs.push(buildMatesQuestionFor(cats[i % cats.length]));
+    }
+    state.examQuestions = qs.sort(function(){ return Math.random() - 0.5; });
+    state.examIndex = 0;
+    state.examScore = 0;
+    renderMatesExamQuestion();
+  }
+  function renderMatesExamQuestion(){
+    state.current = state.examQuestions[state.examIndex];
+    renderMatesQuestion();
+  }
+  function advanceMatesExam(){
+    state.examIndex++;
+    if(state.examIndex >= state.examQuestions.length){
+      endMatesExam();
+    }else{
+      renderMatesExamQuestion();
+    }
+  }
+  function endMatesExam(){
+    var total = state.examQuestions.length;
+    var pct = total ? Math.round((state.examScore/total)*100) : 0;
+    var msg = pct >= 90 ? "¡Sobresaliente! 🏆" : pct >= 70 ? "¡Muy bien! 🎉" : pct >= 50 ? "Vas bien, sigue practicando" : "Repasa un poco más y lo vuelves a intentar";
+    els.gameCard.innerHTML = '<div class="summary">'
+      + '<span class="num">'+state.examScore+'/'+total+'</span>'
+      + '<p>'+msg+' ('+pct+'%)</p>'
+      + '<button class="primary-btn" id="retryExamBtn">Hacer otro examen</button>'
+      + '</div>';
+    document.getElementById("retryExamBtn").addEventListener("click", startMatesExam);
+    updateHint();
+  }
+
   /* ---------------- Arranque (con soporte para republicaciones en caliente) ---------------- */
   function start(saved){
     var validSubject = false;
@@ -2170,6 +2736,11 @@
         var validCats = FR_CATS.map(function(c){ return c.id; });
         var filteredCats = saved.francesCategories.filter(function(c){ return validCats.indexOf(c) !== -1; });
         if(filteredCats.length) state.francesCategories = filteredCats;
+      }
+      if(Array.isArray(saved.matesCategories) && saved.matesCategories.length){
+        var validMatCats = MATES_CATS.map(function(c){ return c.id; });
+        var filteredMatCats = saved.matesCategories.filter(function(c){ return validMatCats.indexOf(c) !== -1; });
+        if(filteredMatCats.length) state.matesCategories = filteredMatCats;
       }
       validSubject = SUBJECTS.some(function(s){ return s.id === saved.subject; });
     }
@@ -2198,7 +2769,8 @@
             mode: restoreMode,
             subject: state.subject,
             view: inSubject ? "subject" : "menu",
-            francesCategories: state.francesCategories
+            francesCategories: state.francesCategories,
+            matesCategories: state.matesCategories
           };
         });
       }
