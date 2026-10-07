@@ -594,6 +594,43 @@
   .mastery-3{grid-template-columns:repeat(3,1fr);}
   .mastery-5{grid-template-columns:repeat(5,1fr);font-size:10px;}
 
+  /* ---------- resumen de examen por categorías ---------- */
+  .exam-breakdown{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    width:100%;
+    max-width:320px;
+    margin:4px auto 0;
+  }
+  .exam-cat-row{
+    display:grid;
+    grid-template-columns:1fr auto auto;
+    align-items:center;
+    gap:10px;
+    background:var(--bg-sunken);
+    border-radius:12px;
+    padding:8px 12px;
+    font-weight:800;
+    font-size:13px;
+  }
+  .exam-cat-name{text-align:left;}
+  .exam-cat-score{color:var(--text-soft);font-variant-numeric:tabular-nums;font-size:12px;}
+  .exam-cat-pct{font-variant-numeric:tabular-nums;min-width:40px;text-align:right;}
+  .exam-cat-pct.m-low{color:var(--wrong);}
+  .exam-cat-pct.m-mid{color:var(--warn-ink);}
+  .exam-cat-pct.m-high{color:var(--success);}
+  .exam-study-more{
+    background:var(--wrong-soft);
+    color:var(--wrong);
+    border-radius:14px;
+    padding:9px 14px;
+    font-weight:800;
+    font-size:13px;
+    margin:6px auto 0;
+    max-width:320px;
+  }
+
   .hint{
     text-align:center;
     color:var(--text-soft);
@@ -778,6 +815,9 @@
     {id:"mesa", label:"Mesa y cocina"},
     {id:"dia", label:"Comidas del día"}
   ];
+  // Para el resumen final del examen: igual que FR_CATS, más la gramática
+  // de Unité 3 (que no tiene categoría propia) como un bloque aparte.
+  var FR_EXAM_CATS = FR_CATS.concat([{id:"gramatica", label:"Gramática"}]);
   var ACCENT_CHARS = ["â","é","è","ê","ë","î","ï","ô","û","ù","ç","œ"];
   var EXAM_LENGTH = 15; // preguntas por examen (menos si la categoría elegida tiene menos palabras)
 
@@ -1046,6 +1086,7 @@
     examQuestions: [],        // preguntas fijas del examen en curso
     examIndex: 0,
     examScore: 0,
+    examCatStats: {},         // { "comida": {correct,total}, ... } — para el resumen final por categoría
     aprenderDeck: [],         // tarjetas (sin preguntar) del modo "Aprender", en orden aleatorio
     aprenderIndex: 0
   };
@@ -2295,7 +2336,15 @@
       if(ok) stats.correct++;
       saveJSON(PROGRESO_FR_KEY, progresoFrances);
     }
-    if(state.mode === "examen" && ok) state.examScore++;
+    if(state.mode === "examen"){
+      if(ok) state.examScore++;
+      // Para el resumen final: cuántos aciertos/fallos ha habido en cada
+      // categoría de vocabulario, y la gramática aparte como su propio bloque.
+      var examCat = esGramatica ? "gramatica" : q.item.cat;
+      var ecs = state.examCatStats[examCat] || (state.examCatStats[examCat] = {correct:0,total:0});
+      ecs.total++;
+      if(ok) ecs.correct++;
+    }
 
     var fb = document.getElementById("feedback");
     if(ok){
@@ -2437,6 +2486,40 @@
       + '</div>';
     document.getElementById("startExamBtn").addEventListener("click", startExam);
   }
+  /* ---------------- Resumen de examen por categorías ----------------
+     Común a francés y matemáticas: usa los aciertos/fallos que se han
+     ido guardando por categoría durante el examen (state.examCatStats)
+     para pintar una fila por categoría y destacar la más floja, así se
+     ve de un vistazo qué repasar más antes del examen de verdad. */
+  function examBreakdownHTML(catDefs){
+    var rows = catDefs.map(function(c){
+      return { label: c.label, stat: state.examCatStats[c.id] || {correct:0,total:0} };
+    }).filter(function(r){ return r.stat.total > 0; });
+    if(rows.length < 1) return "";
+    rows.sort(function(a,b){
+      return (a.stat.correct/a.stat.total) - (b.stat.correct/b.stat.total);
+    });
+    var rowsHTML = rows.map(function(r){
+      var pct = Math.round((r.stat.correct/r.stat.total)*100);
+      var cls = "m-low";
+      if(pct >= 80) cls = "m-high"; else if(pct >= 40) cls = "m-mid";
+      return '<div class="exam-cat-row">'
+        + '<span class="exam-cat-name">'+escapeHTML(r.label)+'</span>'
+        + '<span class="exam-cat-score">'+r.stat.correct+'/'+r.stat.total+'</span>'
+        + '<span class="exam-cat-pct '+cls+'">'+pct+'%</span>'
+        + '</div>';
+    }).join('');
+    var peor = rows[0];
+    var peorPct = Math.round((peor.stat.correct/peor.stat.total)*100);
+    var aviso = "";
+    if(rows.length > 1){
+      aviso = (peorPct < 100)
+        ? '<p class="exam-study-more">📚 Repasa más: '+escapeHTML(peor.label)+' ('+peorPct+'%)</p>'
+        : '<p class="hint">¡Todo al 100%! 🎉</p>';
+    }
+    return '<div class="exam-breakdown">'+rowsHTML+'</div>'+aviso;
+  }
+
   function startExam(){
     var pool = francesPool();
     if(!pool.length) pool = FRANCES_DATA;
@@ -2454,6 +2537,7 @@
     state.examQuestions = qs.sort(function(){ return Math.random() - 0.5; });
     state.examIndex = 0;
     state.examScore = 0;
+    state.examCatStats = {};
     renderExamQuestion();
   }
   function renderExamQuestion(){
@@ -2471,10 +2555,13 @@
   function endExam(){
     var total = state.examQuestions.length;
     var pct = total ? Math.round((state.examScore/total)*100) : 0;
+    var fallos = total - state.examScore;
     var msg = pct >= 90 ? "¡Sobresaliente! 🏆" : pct >= 70 ? "¡Muy bien! 🎉" : pct >= 50 ? "Vas bien, sigue practicando" : "Repasa un poco más y lo vuelves a intentar";
     els.gameCard.innerHTML = '<div class="summary">'
-      + '<span class="num">'+state.examScore+'/'+total+'</span>'
-      + '<p>'+msg+' ('+pct+'%)</p>'
+      + '<span class="num">'+pct+'%</span>'
+      + '<p>'+state.examScore+' aciertos y '+fallos+' fallos de '+total+'</p>'
+      + '<p>'+msg+'</p>'
+      + examBreakdownHTML(FR_EXAM_CATS)
       + '<button class="primary-btn" id="retryExamBtn">Hacer otro examen</button>'
       + '</div>';
     document.getElementById("retryExamBtn").addEventListener("click", startExam);
@@ -2572,7 +2659,14 @@
     stats.total++;
     if(ok) stats.correct++;
     saveJSON(PROGRESO_MATES_KEY, progresoMates);
-    if(state.mode === "examen" && ok) state.examScore++;
+    if(state.mode === "examen"){
+      if(ok) state.examScore++;
+      // Para el resumen final: aciertos/fallos por categoría (numeros,
+      // aproximacion, ordinales, romanos, problemas).
+      var ecs = state.examCatStats[q.cat] || (state.examCatStats[q.cat] = {correct:0,total:0});
+      ecs.total++;
+      if(ok) ecs.correct++;
+    }
 
     var fb = document.getElementById("feedback");
     if(ok){
@@ -2697,6 +2791,7 @@
     state.examQuestions = qs.sort(function(){ return Math.random() - 0.5; });
     state.examIndex = 0;
     state.examScore = 0;
+    state.examCatStats = {};
     renderMatesExamQuestion();
   }
   function renderMatesExamQuestion(){
@@ -2714,10 +2809,13 @@
   function endMatesExam(){
     var total = state.examQuestions.length;
     var pct = total ? Math.round((state.examScore/total)*100) : 0;
+    var fallos = total - state.examScore;
     var msg = pct >= 90 ? "¡Sobresaliente! 🏆" : pct >= 70 ? "¡Muy bien! 🎉" : pct >= 50 ? "Vas bien, sigue practicando" : "Repasa un poco más y lo vuelves a intentar";
     els.gameCard.innerHTML = '<div class="summary">'
-      + '<span class="num">'+state.examScore+'/'+total+'</span>'
-      + '<p>'+msg+' ('+pct+'%)</p>'
+      + '<span class="num">'+pct+'%</span>'
+      + '<p>'+state.examScore+' aciertos y '+fallos+' fallos de '+total+'</p>'
+      + '<p>'+msg+'</p>'
+      + examBreakdownHTML(MATES_CATS)
       + '<button class="primary-btn" id="retryExamBtn">Hacer otro examen</button>'
       + '</div>';
     document.getElementById("retryExamBtn").addEventListener("click", startMatesExam);
