@@ -823,11 +823,12 @@
 
   /* =========================================================
      Gramática de francés (Unité 3): artículos partitivos
-     (du/de la/de l'/des) y conjugación de "manger"/"boire" en
-     je/tu/il-elle, tal y como viene en el libro. No es vocabulario
-     nuevo, así que solo entran en juego cuando la categoría
-     "Comida" está activa (son los alimentos con los que se usan
-     estos artículos y verbos en el libro).
+     (du/de la/de l'/des), tal y como vienen en el libro. No es
+     vocabulario nuevo, así que solo entran en juego cuando la
+     categoría "Comida" está activa (son los alimentos con los que
+     se usan estos artículos en el libro). Los ejercicios de
+     conjugar "manger"/"boire" se han quitado: todavía no los ha
+     dado en clase.
      ========================================================= */
   var PARTITIVO_DATA = [
     {fr:"fromage", partitivo:"du fromage", es:"queso", drink:false},
@@ -1436,7 +1437,7 @@
       var incluyeGramaticaHint = state.francesCategories.indexOf("comida") !== -1;
       if(state.mode === "aprender") els.hint.textContent = "Sin preguntas todavía: lee cada palabra, escúchala y pasa a la siguiente cuando ya te la sepas.";
       else if(state.mode === "practica") els.hint.textContent = incluyeGramaticaHint
-        ? "A veces te pide el significado, escribir la palabra, el artículo, el artículo partitivo (du/de la/de l'/des) o conjugar manger/boire. Todo de memoria."
+        ? "A veces te pide el significado, escribir la palabra, el artículo o el artículo partitivo (du/de la/de l'/des). Todo de memoria."
         : "A veces te pide el significado, a veces escribirla en francés y a veces solo el artículo correcto. Todo de memoria.";
       else if(state.mode === "dictado") els.hint.textContent = "Escucha la palabra y escríbela con su artículo, tal y como la oigas.";
       else if(state.mode === "contrarreloj") els.hint.textContent = "60 segundos de vocabulario" + (incluyeGramaticaHint ? " y gramática" : "") + ". ¡A por tu récord: " + mejorContrarrelojFrances + "!";
@@ -2149,15 +2150,13 @@
   function generateFrancesPregunta(){
     var pool = francesPool();
     if(!pool.length) pool = FRANCES_DATA;
-    // La gramática de Unité 3 (partitivos y manger/boire) solo entra en
-    // juego cuando la categoría Comida está activa, porque es con esos
-    // alimentos con los que el libro la trabaja.
+    // La gramática de Unité 3 (artículos partitivos) solo entra en juego
+    // cuando la categoría Comida está activa, porque es con esos alimentos
+    // con los que el libro la trabaja. Los ejercicios de conjugar verbos
+    // (manger/boire) se han quitado: todavía no los ha dado en clase.
     var incluyeGramatica = state.francesCategories.indexOf("comida") !== -1;
     if(incluyeGramatica && Math.random() < 0.3){
-      var tipo = pick(["partitivo", "conjugacion", "frase"]);
-      if(tipo === "partitivo") return buildPartitivoQuestion();
-      if(tipo === "conjugacion") return buildConjugacionQuestion();
-      return buildFraseQuestion();
+      return buildPartitivoQuestion();
     }
     return buildFrancesQuestion(pick(pool));
   }
@@ -2465,8 +2464,10 @@
      usa el motor de startRound()/endRound() (que es para rondas a tiempo)
      sino un índice propio que avanza pregunta a pregunta. */
   // Si la categoría Comida está activa, el examen reserva un puñado de
-  // preguntas para la gramática de Unité 3 (partitivos y manger/boire) y
-  // el resto son vocabulario, igual que en el libro se mezclan los dos.
+  // preguntas para la gramática de Unité 3 (artículos partitivos) y el
+  // resto son vocabulario, igual que en el libro se mezclan los dos.
+  // (Los ejercicios de conjugar verbos ya no entran: todavía no los ha
+  // dado en clase.)
   function examGramCount(){
     return (state.francesCategories.indexOf("comida") !== -1) ? Math.min(5, EXAM_LENGTH) : 0;
   }
@@ -2531,8 +2532,7 @@
       qs.push(buildFrancesQuestion(shuffled[i]));
     }
     for(var g=0; g<gramCount; g++){
-      var tipo = pick(["partitivo", "conjugacion", "frase"]);
-      qs.push(tipo === "partitivo" ? buildPartitivoQuestion() : (tipo === "conjugacion" ? buildConjugacionQuestion() : buildFraseQuestion()));
+      qs.push(buildPartitivoQuestion());
     }
     state.examQuestions = qs.sort(function(){ return Math.random() - 0.5; });
     state.examIndex = 0;
