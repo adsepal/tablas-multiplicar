@@ -411,6 +411,19 @@
   }
   .feedback.good{color:var(--success);}
   .feedback.bad{color:var(--wrong);}
+  .feedback-repaso{
+    display:block;
+    margin:8px auto 0;
+    max-width:320px;
+    background:var(--bg-sunken);
+    color:var(--text-soft);
+    border-radius:12px;
+    padding:8px 12px;
+    font-size:12.5px;
+    font-weight:700;
+    line-height:1.45;
+    text-align:left;
+  }
 
   .result-mark{
     position:absolute;
@@ -985,15 +998,30 @@
     return { cat:"ordinales", dir:"letras_a_cifras", prompt: capitalize(letras)+".", correct: n, checkType:"numero", correctDisplay: n+".º" };
   }
 
-  /* ---- Preguntas: números romanos (arábigo<->romano) ---- */
+  /* ---- Preguntas: números romanos (arábigo<->romano) ----
+     Además de números sueltos, se incluyen fechas de cuatro cifras
+     (años tipo 1954): es justo lo que suelen pedir pasar a números
+     romanos en los exámenes, así que entran con bastante peso y casi
+     siempre en el sentido cifras → romano (como se pide en el libro). */
   function buildRomanoQuestion(){
     var r = Math.random();
-    var n = r < 0.7 ? randInt(1,99) : (r < 0.9 ? randInt(100,999) : randInt(1000,3999));
-    var roman = arabicToRoman(n);
-    if(Math.random() < 0.5){
-      return { cat:"romanos", dir:"arabigo_a_romano", prompt: String(n), correct: roman, checkType:"romano", correctDisplay: roman };
+    var n, esFecha = false;
+    if(r < 0.45){
+      n = randInt(1,99);
+    }else if(r < 0.65){
+      n = randInt(100,999);
+    }else if(r < 0.9){
+      n = randInt(1000,2099); // fecha/año de cuatro cifras
+      esFecha = true;
+    }else{
+      n = randInt(1000,3999);
     }
-    return { cat:"romanos", dir:"romano_a_arabigo", prompt: roman, correct: n, checkType:"numero", correctDisplay: String(n) };
+    var roman = arabicToRoman(n);
+    var haciaRomano = esFecha ? (Math.random() < 0.85) : (Math.random() < 0.5);
+    if(haciaRomano){
+      return { cat:"romanos", dir:"arabigo_a_romano", prompt: String(n), correct: roman, checkType:"romano", correctDisplay: roman, esFecha: esFecha };
+    }
+    return { cat:"romanos", dir:"romano_a_arabigo", prompt: roman, correct: n, checkType:"numero", correctDisplay: String(n), esFecha: esFecha };
   }
 
   /* ---- Preguntas: problemas con números grandes (originales, parametrizados) ----
@@ -1037,6 +1065,131 @@
   function buildProblemaQuestion(){
     var r = pick(PROBLEMA_TEMPLATES)();
     return { cat:"problemas", dir:"problema", prompt: r.prompt, correct: r.correct, checkType:"numero", correctDisplay: formatMiles(r.correct) };
+  }
+
+  /* =========================================================
+     Repasos al fallar: cuando se equivoca en matemáticas no basta con
+     decir "era X", así que aquí se arma una explicación breve de POR QUÉ
+     es esa la respuesta, distinta para cada tipo de pregunta. Se calcula
+     a partir de los datos que ya trae la propia pregunta (prompt, correct,
+     correctDisplay), para que funcione igual la primera vez que se falla
+     y cuando se repasa luego desde "Fallos".
+     ========================================================= */
+  // Descompone un número en sus bloques de millares/centenas/decenas/unidades
+  // y convierte cada bloque a romano por separado: como los símbolos M/D/C/L/X/V/I
+  // van cada uno con su orden decimal, el resultado es exactamente el mismo
+  // que uniendo esos bloques tal cual.
+  function romanPlaceBreakdown(n){
+    var miles = Math.floor(n/1000)*1000;
+    var cientos = Math.floor((n%1000)/100)*100;
+    var decenas = Math.floor((n%100)/10)*10;
+    var unidades = n%10;
+    return [miles, cientos, decenas, unidades].filter(function(v){ return v>0; }).map(function(v){
+      return { value:v, sym:arabicToRoman(v) };
+    });
+  }
+  function romanoRepaso(n, roman){
+    var parts = romanPlaceBreakdown(n);
+    if(parts.length <= 1) return "Repaso: "+formatMiles(n)+" = "+roman+".";
+    var piezas = parts.map(function(p){ return formatMiles(p.value)+" ("+p.sym+")"; }).join(" + ");
+    return "Repaso: "+formatMiles(n)+" = "+piezas+" → "+roman+".";
+  }
+  function leerRepaso(n, correctDisplay){
+    var miles = Math.floor(n/1000), resto = n%1000;
+    if(miles === 0) return "Repaso: "+formatMiles(n)+" = "+correctDisplay+".";
+    var restoTxt = resto>0 ? " + "+resto : "";
+    return "Repaso: "+formatMiles(n)+" = "+miles+" mil"+restoTxt+" → "+correctDisplay+".";
+  }
+  function componerRepaso(n){
+    var s5 = ("00000"+n).slice(-5);
+    var labels = ["decenas de millar","unidades de millar","centenas","decenas","unidades"];
+    var terms = [];
+    for(var i=0;i<5;i++){
+      var d = parseInt(s5[i],10);
+      if(d>0) terms.push(d+" "+labels[i]);
+    }
+    if(!terms.length) terms.push("0 unidades");
+    return "Repaso: "+terms.join(" + ")+" = "+formatMiles(n)+".";
+  }
+  function descomponerRepaso(n, place, digit){
+    return "Repaso: en "+formatMiles(n)+", de derecha a izquierda las posiciones son unidades, decenas, centenas, unidades de millar y decenas de millar. La cifra de "+place+" es "+digit+".";
+  }
+  function compararRepaso(n1, n2, simbolo){
+    var s1 = String(n1), s2 = String(n2);
+    if(s1.length !== s2.length){
+      return "Repaso: "+formatMiles(n1)+" tiene "+s1.length+" cifras y "+formatMiles(n2)+" tiene "+s2.length+": el que tiene más cifras es mayor → "+formatMiles(n1)+" "+simbolo+" "+formatMiles(n2)+".";
+    }
+    for(var i=0;i<s1.length;i++){
+      if(s1[i] !== s2[i]){
+        return "Repaso: comparando cifra a cifra desde la izquierda, en esa posición hay "+s1[i]+" frente a "+s2[i]+" → "+formatMiles(n1)+" "+simbolo+" "+formatMiles(n2)+".";
+      }
+    }
+    return "Repaso: "+formatMiles(n1)+" "+simbolo+" "+formatMiles(n2)+".";
+  }
+  function aproximarRepaso(n, orden, redondeado){
+    var decisivo;
+    if(orden === "decenas") decisivo = n % 10;
+    else if(orden === "centenas") decisivo = Math.floor(n/10) % 10;
+    else decisivo = Math.floor(n/100) % 10;
+    var sube = decisivo >= 5;
+    return "Repaso: la cifra que decide es "+decisivo+" (5 o más sube, menos de 5 se queda igual) → "+formatMiles(n)+" se "+(sube?"redondea subiendo":"queda igual")+" a "+formatMiles(redondeado)+".";
+  }
+  function ordinalRepaso(n){
+    if(n<10) return "Repaso: "+n+" → "+ordinalToWords(n)+".";
+    if(n<20) return "Repaso: del 11 al 19 son formas especiales (once→undécimo, doce→duodécimo...) → "+n+" → "+ordinalToWords(n)+".";
+    var t = Math.floor(n/10), u = n%10;
+    if(u===0) return "Repaso: "+n+" → "+ordinalToWords(n)+".";
+    return "Repaso: "+n+" = "+(t*10)+" + "+u+" → "+ORD_DECENAS[t]+" + "+ORD_UNIDADES[u]+" = "+ordinalToWords(n)+".";
+  }
+  // Arma el repaso a partir de los campos que ya trae la pregunta (cat, dir,
+  // prompt, correct, correctDisplay), parseando el propio prompt cuando hace
+  // falta el número original: así funciona igual recién fallada que cuando
+  // se repesca luego desde "Fallos" (que solo guarda esos mismos campos).
+  function buildMatesRepaso(q){
+    try{
+      if(q.cat === "romanos"){
+        var n, roman;
+        if(q.dir === "arabigo_a_romano"){ n = parseInt(q.prompt,10); roman = q.correct; }
+        else{ roman = q.prompt; n = q.correct; }
+        return romanoRepaso(n, roman);
+      }
+      if(q.cat === "numeros"){
+        if(q.dir === "leer"){
+          return leerRepaso(parseInt(q.prompt.replace(/\./g,""),10), q.correctDisplay);
+        }
+        if(q.dir === "componer"){
+          return componerRepaso(q.correct);
+        }
+        if(q.dir === "descomponer"){
+          var m = /¿Cuántas (.+) tiene ([\d.]+)\?/.exec(q.prompt);
+          if(!m) return "";
+          return descomponerRepaso(parseInt(m[2].replace(/\./g,""),10), m[1], q.correct);
+        }
+        if(q.dir === "comparar"){
+          var parts = q.prompt.split("___").map(function(s){ return s.trim(); });
+          return compararRepaso(parseInt(parts[0].replace(/\./g,""),10), parseInt(parts[1].replace(/\./g,""),10), q.correct);
+        }
+      }
+      if(q.cat === "aproximacion"){
+        var ma = /Aproxima ([\d.]+) a las (\w+)\./.exec(q.prompt);
+        if(!ma) return "";
+        return aproximarRepaso(parseInt(ma[1].replace(/\./g,""),10), ma[2], q.correct);
+      }
+      if(q.cat === "ordinales"){
+        var n4;
+        if(q.dir === "cifras_a_letras"){
+          var mo = /^(\d+)\.º$/.exec(q.prompt);
+          n4 = mo ? parseInt(mo[1],10) : null;
+        }else{
+          n4 = q.correct;
+        }
+        return (n4 != null) ? ordinalRepaso(n4) : "";
+      }
+      if(q.cat === "problemas"){
+        return "Repaso: vuelve a leer el problema por partes y anota cada dato antes de calcular. La respuesta era "+q.correctDisplay+".";
+      }
+    }catch(e){ return ""; }
+    return "";
   }
 
   function generateMatesPregunta(){
@@ -1596,6 +1749,16 @@
     els.gameCard.appendChild(btn);
   }
 
+  // Repaso simple al fallar una tabla: la deshace en sumas repetidas del
+  // factor más grande, tantas veces como el más pequeño (así "8×7" y "7×8"
+  // dan el mismo repaso, que es como ella debería verlo también).
+  function tablaRepaso(a,b,correct){
+    var factor = Math.max(a,b), veces = Math.min(a,b);
+    var terms = [];
+    for(var i=0;i<veces;i++) terms.push(factor);
+    return "Repaso: "+factor+" sumado "+veces+" "+(veces===1?"vez":"veces")+" → "+terms.join(" + ")+" = "+correct+".";
+  }
+
   function checkAnswer(){
     if(state.answered || state.currentInput === "") return;
     state.answered = true;
@@ -1622,7 +1785,9 @@
       removeFromFallos(q.a, q.b);
     }else{
       state.streak = 0;
-      fb.textContent = "Era "+q.a+" × "+q.b+" = "+q.correct+". ¡A por la siguiente!";
+      var repasoTabla = tablaRepaso(q.a, q.b, q.correct);
+      fb.innerHTML = "Pusiste "+value+", era "+q.a+" × "+q.b+" = "+q.correct+"."
+        + '<br><span class="feedback-repaso">'+repasoTabla+'</span>';
       fb.className = "feedback bad";
       addToFallos(q.a, q.b);
     }
@@ -2306,6 +2471,28 @@
     });
   }
 
+  // Repaso simple al fallar una palabra: para las direcciones donde hay que
+  // escribir la palabra en francés (no solo el significado) se puede dar
+  // una regla corta de verdad (género, o el artículo partitivo); para el
+  // significado (fr2es) no hay regla que explicar, es memorizar.
+  function buildFrancesRepaso(q){
+    if(q.dir === "partitivo"){
+      var phrase = q.item.fr; // ej. "du fromage" / "de la confiture" / "de l'eau" / "des pâtes"
+      var regla = "";
+      if(/^du /.test(phrase)) regla = "empieza por consonante y es masculino → du";
+      else if(/^de la /.test(phrase)) regla = "empieza por consonante y es femenino → de la";
+      else if(/^de l['’]/.test(phrase)) regla = "empieza por vocal (o h muda) → de l'";
+      else if(/^des /.test(phrase)) regla = "está en plural → des";
+      return "Repaso: "+(regla ? regla+". " : "")+"Se escribe: "+phrase+".";
+    }
+    if(q.dir === "articulo" || q.dir === "es2fr" || q.dir === "dictado"){
+      var palabra = q.item.fr.replace(/^(le|la|un|une|les)\s+/, "");
+      var generoTxt = (q.item.g === "f") ? "femenino → la/une" : "masculino → le/un";
+      return "Repaso: \""+palabra+"\" es "+generoTxt+". Se escribe: "+q.item.fr+".";
+    }
+    return ""; // fr2es: es solo memorizar el significado, no hay regla que dar
+  }
+
   function checkFrancesAnswer(){
     if(state.answered) return;
     var input = document.getElementById("fracesInput");
@@ -2356,7 +2543,9 @@
     }else{
       state.streak = 0;
       var correcta = (q.dir === "fr2es") ? q.item.es[0] : q.item.fr;
-      fb.textContent = "Era: " + correcta + ". ¡A por la siguiente!";
+      var repasoFr = buildFrancesRepaso(q);
+      fb.innerHTML = 'Pusiste "'+escapeHTML(raw.trim())+'", era "'+escapeHTML(correcta)+'".'
+        + (repasoFr ? '<br><span class="feedback-repaso">'+escapeHTML(repasoFr)+'</span>' : '');
       fb.className = "feedback bad";
       if(!esGramatica) addToFallosFrances(q.item.fr);
     }
@@ -2581,7 +2770,7 @@
     if(q.dir === "comparar") return "Escribe <, > o =";
     if(q.dir === "aproximar") return "Escribe el número aproximado";
     if(q.dir === "letras_a_cifras") return "Escribe el número con cifras";
-    if(q.dir === "arabigo_a_romano") return "Escribe el número romano";
+    if(q.dir === "arabigo_a_romano") return q.esFecha ? "Escribe el año en números romanos" : "Escribe el número romano";
     if(q.dir === "romano_a_arabigo") return "Escribe el número en cifras";
     if(q.dir === "problema") return "Resuelve el problema";
     return "Escribe la respuesta";
@@ -2678,7 +2867,9 @@
       removeFromFallosMates(q);
     }else{
       state.streak = 0;
-      fb.textContent = "Era: " + q.correctDisplay + ". ¡A por la siguiente!";
+      var repasoMates = buildMatesRepaso(q);
+      fb.innerHTML = 'Pusiste "'+escapeHTML(raw.trim())+'", era "'+escapeHTML(q.correctDisplay)+'".'
+        + (repasoMates ? '<br><span class="feedback-repaso">'+escapeHTML(repasoMates)+'</span>' : '');
       fb.className = "feedback bad";
       addToFallosMates(q);
     }
